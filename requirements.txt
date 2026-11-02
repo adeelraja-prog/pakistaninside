@@ -1,7 +1,5 @@
-google-genai
+google-generativeai
 requests
-pillow
-tweepy
-facebook-sdk
-feedparser
+Pillow
 beautifulsoup4
+feedparser
