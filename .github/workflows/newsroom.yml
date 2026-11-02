@@ -3,9 +3,12 @@ name: 24/7 Pakistan Inside Newsroom Automation
 
 on:
   workflow_dispatch:
-
-  schedule:
-    - cron: '0 */4 * * *'
+    inputs:
+      preflight_only:
+        description: "Run safe checks only (no Gemini call or Facebook post)"
+        required: true
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -41,12 +44,38 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Verify Urdu Font
+      - name: Verify Python Files
         run: |
-          fc-match "Noto Naskh Arabic"
-          python -c "from PIL import features; print('RAQM support:', features.check('raqm'))"
+          python -m compileall -q .
+
+      - name: Verify Urdu Rendering
+        run: |
+          python - <<'PY'
+          import os
+          from PIL import ImageFont, features
+
+          font_path = "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf"
+
+          print("RAQM support:", features.check("raqm"))
+          print("Noto Urdu font exists:", os.path.isfile(font_path))
+
+          if not features.check("raqm"):
+              raise SystemExit("FAIL: Pillow is missing RAQM support.")
+
+          if not os.path.isfile(font_path):
+              raise SystemExit("FAIL: Noto Naskh Arabic font was not installed.")
+
+          font = ImageFont.truetype(
+              font_path,
+              40,
+              layout_engine=ImageFont.Layout.RAQM
+          )
+
+          print("PASS: Urdu font loaded with RAQM.")
+          PY
 
       - name: Run Newsroom Engine
+        if: ${{ inputs.preflight_only == false }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
@@ -55,3 +84,9 @@ jobs:
           FACEBOOK_GRAPH_API_VERSION: v26.0
         run: |
           python main.py
+
+      - name: Confirm Preflight Completed
+        if: ${{ inputs.preflight_only == true }}
+        run: |
+          echo "Preflight passed. Gemini was not called."
+          echo "Facebook was not contacted."
