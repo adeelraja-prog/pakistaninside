@@ -1,0 +1,7 @@
+google-genai
+requests
+pillow
+tweepy
+facebook-sdk
+feedparser
+beautifulsoup4
