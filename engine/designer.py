@@ -1,6 +1,6 @@
 
 import os
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, features
 
 
 class DesignerAgent:
@@ -24,15 +24,48 @@ class DesignerAgent:
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         ]
 
-    def load_font(self, size):
+        # Proper Urdu/Arabic shaping requires Pillow's RAQM support.
+        if not features.check("raqm"):
+            raise RuntimeError(
+                "Pillow does not have RAQM support. "
+                "Cannot safely render Urdu text."
+            )
+
+        self.font_path = self.find_font()
+
+    def find_font(self):
         for path in self.font_paths:
             if os.path.isfile(path):
                 try:
-                    return ImageFont.truetype(path, size)
+                    ImageFont.truetype(
+                        path,
+                        32,
+                        layout_engine=ImageFont.Layout.RAQM
+                    )
+                    print(f"[DESIGNER] Using font: {path}")
+                    return path
                 except Exception:
                     continue
 
-        return ImageFont.load_default()
+        raise RuntimeError(
+            "No suitable Urdu font found. "
+            "Install Noto Naskh Arabic or add it to assets/fonts."
+        )
+
+    def load_font(self, size):
+        return ImageFont.truetype(
+            self.font_path,
+            size,
+            layout_engine=ImageFont.Layout.RAQM
+        )
+
+    def text_width(self, draw, text, font):
+        return draw.textlength(
+            text,
+            font=font,
+            direction="rtl",
+            language="ur"
+        )
 
     def wrap_urdu_text(self, draw, text, font, max_width):
         words = str(text).split()
@@ -40,28 +73,14 @@ class DesignerAgent:
         current_line = ""
 
         for word in words:
-            test_line = (
-                f"{current_line} {word}".strip()
-            )
+            test_line = f"{current_line} {word}".strip()
 
-            try:
-                line_width = draw.textlength(
-                    test_line,
-                    font=font,
-                    direction="rtl",
-                    language="ur"
-                )
-            except Exception:
-                line_width = draw.textlength(
-                    test_line,
-                    font=font
-                )
-
-            if line_width <= max_width:
+            if self.text_width(draw, test_line, font) <= max_width:
                 current_line = test_line
             else:
                 if current_line:
                     lines.append(current_line)
+
                 current_line = word
 
         if current_line:
@@ -82,30 +101,23 @@ class DesignerAgent:
         y = top
 
         for line in lines:
-            try:
-                draw.text(
-                    (right, y),
-                    line,
-                    font=font,
-                    fill=fill,
-                    anchor="ra",
-                    direction="rtl",
-                    language="ur"
-                )
-            except Exception:
-                draw.text(
-                    (right, y),
-                    line,
-                    font=font,
-                    fill=fill,
-                    anchor="ra"
-                )
+            draw.text(
+                (right, y),
+                line,
+                font=font,
+                fill=fill,
+                anchor="ra",
+                direction="rtl",
+                language="ur"
+            )
 
             bbox = draw.textbbox(
                 (right, y),
                 line,
                 font=font,
-                anchor="ra"
+                anchor="ra",
+                direction="rtl",
+                language="ur"
             )
 
             y += max(45, bbox[3] - bbox[1]) + line_spacing
@@ -115,7 +127,9 @@ class DesignerAgent:
     def generate_card(self, processed_data):
 
         if not isinstance(processed_data, dict):
-            raise ValueError("Invalid editorial data supplied to Designer.")
+            raise ValueError(
+                "Invalid editorial data supplied to Designer."
+            )
 
         headline = str(
             processed_data.get("headline", "")
@@ -130,10 +144,14 @@ class DesignerAgent:
         ).strip()
 
         if not headline:
-            raise ValueError("Cannot design a card without a headline.")
+            raise ValueError(
+                "Cannot design a card without a headline."
+            )
 
         if not body:
-            raise ValueError("Cannot design a card without news body text.")
+            raise ValueError(
+                "Cannot design a card without news body text."
+            )
 
         img = Image.new(
             "RGB",
@@ -143,18 +161,13 @@ class DesignerAgent:
 
         draw = ImageDraw.Draw(img)
 
-        # Top brand header
+        # Header band
         draw.rectangle(
             [0, 0, self.width, 145],
             fill=self.red
         )
 
-        brand_font = ImageFont.truetype(
-            self.font_paths[2]
-            if os.path.isfile(self.font_paths[2])
-            else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            48
-        )
+        brand_font = self.load_font(48)
 
         draw.text(
             (55, 43),
@@ -163,9 +176,9 @@ class DesignerAgent:
             fill=self.white
         )
 
-        # Tag
+        # News category tag
         draw.rounded_rectangle(
-            [55, 185, 390, 250],
+            [55, 185, 520, 250],
             radius=12,
             fill=self.gold
         )
@@ -176,7 +189,9 @@ class DesignerAgent:
             (75, 198),
             tag,
             font=tag_font,
-            fill=(20, 20, 20)
+            fill=(20, 20, 20),
+            direction="rtl",
+            language="ur"
         )
 
         # Headline
@@ -210,7 +225,7 @@ class DesignerAgent:
             fill=self.red
         )
 
-        # News body
+        # News summary
         body_font = self.load_font(43)
 
         body_lines = self.wrap_urdu_text(
@@ -230,7 +245,7 @@ class DesignerAgent:
             14
         )
 
-        # Footer
+        # Footer band
         draw.rectangle(
             [0, 1000, self.width, self.height],
             fill=(10, 13, 18)
@@ -253,10 +268,14 @@ class DesignerAgent:
         img.save(card_path, format="PNG")
 
         if not os.path.isfile(card_path):
-            raise RuntimeError("News graphic could not be saved.")
+            raise RuntimeError(
+                "News graphic could not be saved."
+            )
 
         if os.path.getsize(card_path) == 0:
-            raise RuntimeError("Generated news graphic is empty.")
+            raise RuntimeError(
+                "Generated news graphic is empty."
+            )
 
         print(
             f"[DESIGNER] News graphic generated: {card_path}"
