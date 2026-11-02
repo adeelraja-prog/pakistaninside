@@ -1,73 +1,137 @@
 
 import os
 import re
+import glob
 from PIL import Image, ImageDraw, ImageFont, features
 
 
 class DesignerAgent:
+
     WIDTH = 1080
     HEIGHT = 1350
+
     OUTPUT_PATH = "assets/output/latest_news_card.png"
 
-    BG = (12, 24, 21)
-    BG_LIGHT = (21, 43, 34)
+    # Pakistan Inside visual identity
+    BG = (12, 27, 23)
+    BG_ACCENT = (20, 43, 34)
     GOLD = (218, 181, 99)
-    WHITE = (250, 248, 240)
-    MUTED = (207, 213, 204)
-    GREEN = (37, 83, 61)
+    WHITE = (250, 248, 241)
+    MUTED = (205, 215, 207)
+    LINE = (73, 104, 83)
 
-    FONT_CANDIDATES = [
-        "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Bold.ttf",
-        "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf",
+    URDU_FONT_CANDIDATES = [
+        "/usr/share/fonts/truetype/noto/NotoNastaliqUrdu-Regular.ttf",
+        "/usr/share/fonts/truetype/noto/NotoNastaliqUrdu-Bold.ttf",
+    ]
+
+    ENGLISH_FONT_CANDIDATES = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     ]
 
     def __init__(self):
-        self.font_path = next(
-            (p for p in self.FONT_CANDIDATES if os.path.isfile(p)),
-            None
-        )
 
-        if not self.font_path:
-            raise FileNotFoundError(
-                "Noto Urdu font not found. Install fonts-noto-core."
-            )
+        self.urdu_font_path = self._find_urdu_font()
+        self.english_font_path = self._find_english_font()
 
         if not features.check("raqm"):
             raise RuntimeError(
-                "Pillow RAQM is required for proper Urdu text rendering."
+                "Pillow RAQM is unavailable. "
+                "Correct Urdu text shaping cannot be guaranteed."
             )
 
-        print(f"[DESIGNER] Using font: {self.font_path}")
+        print("[DESIGNER] Urdu font:", self.urdu_font_path)
+        print("[DESIGNER] English font:", self.english_font_path)
+        print("[DESIGNER] RAQM support: enabled")
 
-    def font(self, size):
+    def _find_urdu_font(self):
+
+        for path in self.URDU_FONT_CANDIDATES:
+            if os.path.isfile(path):
+                return path
+
+        matches = glob.glob(
+            "/usr/share/fonts/**/*Nastaliq*",
+            recursive=True
+        )
+
+        for path in matches:
+            if path.lower().endswith((".ttf", ".otf")):
+                return path
+
+        raise FileNotFoundError(
+            "Noto Nastaliq Urdu font not found. "
+            "Install Ubuntu package fonts-noto-extra. "
+            "Poster generation stopped to prevent unreadable Urdu."
+        )
+
+    def _find_english_font(self):
+
+        for path in self.ENGLISH_FONT_CANDIDATES:
+            if os.path.isfile(path):
+                return path
+
+        raise FileNotFoundError(
+            "DejaVu English font not found."
+        )
+
+    def urdu_font(self, size):
+
         return ImageFont.truetype(
-            self.font_path,
+            self.urdu_font_path,
             size,
             layout_engine=ImageFont.Layout.RAQM
         )
 
+    def english_font(self, size):
+
+        return ImageFont.truetype(
+            self.english_font_path,
+            size
+        )
+
     @staticmethod
-    def clean_text(value):
-        if value is None:
+    def clean(value):
+
+        if not value:
             return ""
 
         value = str(value)
-        value = re.sub(r"https?://\S+", "", value)
-        value = re.sub(r"www\.\S+", "", value)
+
+        value = re.sub(
+            r"https?://\S+|www\.\S+",
+            "",
+            value
+        )
+
         value = re.sub(r"<[^>]+>", "", value)
         value = re.sub(r"\s+", " ", value)
+
         return value.strip()
 
     @staticmethod
-    def normalise(value):
-        value = str(value or "").lower()
-        value = re.sub(r"[^\w\s]", "", value)
-        return re.sub(r"\s+", " ", value).strip()
+    def has_urdu(text):
 
-    def is_duplicate(self, a, b):
-        a = self.normalise(a)
-        b = self.normalise(b)
+        return bool(
+            re.search(
+                r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]",
+                text or ""
+            )
+        )
+
+    @staticmethod
+    def normalise(text):
+
+        text = str(text or "").lower()
+        text = re.sub(r"[^\w\s]", "", text)
+
+        return re.sub(r"\s+", " ", text).strip()
+
+    def is_duplicate(self, first, second):
+
+        a = self.normalise(first)
+        b = self.normalise(second)
 
         if not a or not b:
             return False
@@ -75,29 +139,81 @@ class DesignerAgent:
         return a == b or a in b or b in a
 
     def remove_duplicate_sentences(self, text):
-        sentences = re.split(r"(?<=[۔.!؟])\s+", text)
-        output = []
+
+        sentences = re.split(
+            r"(?<=[۔.!؟])\s+",
+            text
+        )
+
+        result = []
         seen = set()
 
         for sentence in sentences:
+
             sentence = sentence.strip()
             key = self.normalise(sentence)
 
             if key and key not in seen:
                 seen.add(key)
-                output.append(sentence)
+                result.append(sentence)
 
-        return " ".join(output)
+        return " ".join(result)
 
-    def wrap_text(self, draw, text, font, max_width):
+    def prepare_content(self, data):
+
+        headline = self.clean(data.get("headline"))
+        urdu_text = self.clean(data.get("urdu_text"))
+        body = self.clean(data.get("body"))
+
+        # Prefer an actual Urdu headline.
+        if not self.has_urdu(headline):
+            if self.has_urdu(urdu_text):
+                headline = urdu_text
+                urdu_text = ""
+            elif self.has_urdu(body):
+                headline = body
+                body = ""
+
+        if not headline:
+            raise ValueError(
+                "No usable headline was supplied by the Editor."
+            )
+
+        candidates = []
+
+        for item in (urdu_text, body):
+
+            if not item:
+                continue
+
+            if not self.has_urdu(item):
+                continue
+
+            if self.is_duplicate(item, headline):
+                continue
+
+            if any(self.is_duplicate(item, old) for old in candidates):
+                continue
+
+            candidates.append(item)
+
+        summary = max(candidates, key=len) if candidates else ""
+
+        summary = self.remove_duplicate_sentences(summary)
+
+        return headline, summary
+
+    def wrap_urdu(self, draw, text, font, max_width):
+
         words = text.split()
         lines = []
         current = ""
 
         for word in words:
+
             candidate = f"{current} {word}".strip()
 
-            box = draw.textbbox(
+            bbox = draw.textbbox(
                 (0, 0),
                 candidate,
                 font=font,
@@ -105,11 +221,15 @@ class DesignerAgent:
                 language="ur"
             )
 
-            if box[2] - box[0] <= max_width:
+            width = bbox[2] - bbox[0]
+
+            if width <= max_width:
                 current = candidate
+
             else:
                 if current:
                     lines.append(current)
+
                 current = word
 
         if current:
@@ -117,232 +237,251 @@ class DesignerAgent:
 
         return lines
 
-    def line_height(self, draw, font):
-        box = draw.textbbox(
+    def text_height(self, draw, text, font):
+
+        bbox = draw.textbbox(
             (0, 0),
-            "پاکستان",
+            text or "پاکستان",
             font=font,
             direction="rtl",
             language="ur"
         )
-        return max(1, box[3] - box[1])
 
-    def fit_text(self, draw, text, max_width, max_height,
-                 starting_size, minimum_size, spacing):
-        """
-        Find a font size that fits all text without silently
-        dropping lines or cutting off the story.
-        """
-        for size in range(starting_size, minimum_size - 1, -2):
-            font = self.font(size)
-            lines = self.wrap_text(draw, text, font, max_width)
-            height = (
-                len(lines) * self.line_height(draw, font)
-                + max(0, len(lines) - 1) * spacing
+        return max(1, bbox[3] - bbox[1])
+
+    def fit_urdu(
+        self,
+        draw,
+        text,
+        max_width,
+        max_height,
+        starting_size,
+        minimum_size
+    ):
+
+        for size in range(
+            starting_size,
+            minimum_size - 1,
+            -2
+        ):
+
+            font = self.urdu_font(size)
+
+            lines = self.wrap_urdu(
+                draw,
+                text,
+                font,
+                max_width
             )
 
-            if height <= max_height:
-                return font, lines, height
+            heights = [
+                self.text_height(draw, line, font)
+                for line in lines
+            ]
 
-        font = self.font(minimum_size)
-        lines = self.wrap_text(draw, text, font, max_width)
-        height = (
-            len(lines) * self.line_height(draw, font)
-            + max(0, len(lines) - 1) * spacing
+            total_height = sum(heights) + max(
+                0,
+                len(lines) - 1
+            ) * 24
+
+            if total_height <= max_height:
+
+                return font, lines, heights
+
+        raise ValueError(
+            "Urdu text is too long for the poster. "
+            "The Designer will not silently truncate the story."
         )
 
-        return font, lines, height
+    def draw_urdu(
+        self,
+        draw,
+        lines,
+        heights,
+        font,
+        start_y,
+        color
+    ):
 
-    def draw_rtl_lines(self, draw, lines, font, y, fill, spacing):
-        for line in lines:
+        y = start_y
+
+        for line, height in zip(lines, heights):
+
             draw.text(
                 (995, y),
                 line,
                 font=font,
-                fill=fill,
+                fill=color,
                 anchor="ra",
                 direction="rtl",
                 language="ur"
             )
-            y += self.line_height(draw, font) + spacing
+
+            y += height + 24
 
         return y
 
     def create_background(self):
-        image = Image.new("RGB", (self.WIDTH, self.HEIGHT), self.BG)
+
+        image = Image.new(
+            "RGB",
+            (self.WIDTH, self.HEIGHT),
+            self.BG
+        )
+
         draw = ImageDraw.Draw(image)
 
-        # Subtle editorial background treatment.
+        # Subtle geometric editorial background.
         draw.rectangle(
-            (0, 0, self.WIDTH, 14),
+            (0, 0, self.WIDTH, 13),
             fill=self.GOLD
         )
 
-        draw.ellipse(
-            (-420, 780, 350, 1550),
-            fill=self.BG_LIGHT
+        draw.polygon(
+            [
+                (0, 920),
+                (0, 1350),
+                (420, 1350)
+            ],
+            fill=self.BG_ACCENT
         )
 
-        draw.ellipse(
-            (850, -350, 1450, 300),
-            fill=(17, 34, 28)
+        draw.line(
+            (80, 134, 1000, 134),
+            fill=self.LINE,
+            width=2
         )
 
         return image
 
-    def draw_masthead(self, draw):
-        # Custom PI monogram logo.
-        draw.ellipse(
-            (78, 66, 170, 158),
-            outline=self.GOLD,
-            width=4
-        )
+    def draw_brand(self, draw):
 
+        # Proper English wordmark, separate from Urdu font.
         draw.text(
-            (124, 111),
+            (80, 55),
             "PI",
-            font=self.font(35),
-            fill=self.GOLD,
-            anchor="mm"
+            font=self.english_font(48),
+            fill=self.GOLD
         )
 
-        # Brand name.
         draw.text(
-            (995, 75),
+            (1000, 57),
             "PAKISTAN INSIDE",
-            font=self.font(48),
+            font=self.english_font(43),
             fill=self.WHITE,
             anchor="ra"
         )
 
         draw.text(
-            (995, 137),
+            (1000, 112),
             "THE STORY BEHIND THE STORY",
-            font=self.font(20),
+            font=self.english_font(17),
             fill=self.GOLD,
             anchor="ra"
         )
 
-        draw.line(
-            (80, 205, 1000, 205),
-            fill=self.GREEN,
-            width=3
-        )
+    def draw_footer(self, draw):
 
-    def prepare_content(self, data):
-        headline = self.clean_text(data.get("headline"))
-        urdu_text = self.clean_text(data.get("urdu_text"))
-        body = self.clean_text(data.get("body"))
-
-        if not headline:
-            headline = urdu_text or body
-
-        if not headline:
-            raise ValueError("No editorial headline or story was provided.")
-
-        # Select one distinct summary, not repeated copies.
-        candidates = [urdu_text, body]
-        candidates = [
-            item for item in candidates
-            if item and not self.is_duplicate(item, headline)
-        ]
-
-        summary = max(candidates, key=len) if candidates else ""
-
-        if summary:
-            summary = self.remove_duplicate_sentences(summary)
-
-        return headline, summary
-
-    def generate_card(self, edited_data):
-        if not isinstance(edited_data, dict):
-            raise TypeError("Editorial data must be a dictionary.")
-
-        headline, summary = self.prepare_content(edited_data)
-
-        image = self.create_background()
-        draw = ImageDraw.Draw(image)
-
-        self.draw_masthead(draw)
-
-        # Main headline.
-        headline_top = 275
-        headline_area_height = 390
-
-        headline_font, headline_lines, headline_height = self.fit_text(
-            draw=draw,
-            text=headline,
-            max_width=900,
-            max_height=headline_area_height,
-            starting_size=76,
-            minimum_size=43,
-            spacing=19
-        )
-
-        headline_end = self.draw_rtl_lines(
-            draw,
-            headline_lines,
-            headline_font,
-            headline_top,
-            self.WHITE,
-            19
-        )
-
-        # Gold editorial divider.
-        divider_y = max(710, headline_end + 35)
-
-        draw.line(
-            (80, divider_y, 1000, divider_y),
-            fill=self.GOLD,
-            width=4
-        )
-
-        # Summary.
-        if summary:
-            summary_top = divider_y + 48
-            summary_area_height = 1230 - summary_top - 45
-
-            summary_font, summary_lines, summary_height = self.fit_text(
-                draw=draw,
-                text=summary,
-                max_width=900,
-                max_height=summary_area_height,
-                starting_size=39,
-                minimum_size=25,
-                spacing=16
-            )
-
-            self.draw_rtl_lines(
-                draw,
-                summary_lines,
-                summary_font,
-                summary_top,
-                self.MUTED,
-                16
-            )
-
-        # Footer identity. No source name, URL or duplicate headline.
         draw.line(
             (80, 1230, 1000, 1230),
-            fill=self.GREEN,
+            fill=self.LINE,
             width=2
         )
 
         draw.text(
-            (995, 1260),
+            (1000, 1260),
             "PAKISTAN INSIDE",
-            font=self.font(27),
+            font=self.english_font(23),
             fill=self.GOLD,
             anchor="ra"
         )
 
         draw.text(
-            (995, 1305),
+            (1000, 1300),
             "THE STORY BEHIND THE STORY",
-            font=self.font(18),
+            font=self.english_font(15),
             fill=self.MUTED,
             anchor="ra"
         )
+
+    def generate_card(self, edited_data):
+
+        if not isinstance(edited_data, dict):
+            raise TypeError(
+                "Designer expected a dictionary from the Editor."
+            )
+
+        headline, summary = self.prepare_content(
+            edited_data
+        )
+
+        image = self.create_background()
+        draw = ImageDraw.Draw(image)
+
+        self.draw_brand(draw)
+
+        # Main Urdu headline.
+        headline_font, headline_lines, headline_heights = (
+            self.fit_urdu(
+                draw=draw,
+                text=headline,
+                max_width=900,
+                max_height=380,
+                starting_size=76,
+                minimum_size=40
+            )
+        )
+
+        headline_end = self.draw_urdu(
+            draw,
+            headline_lines,
+            headline_heights,
+            headline_font,
+            215,
+            self.WHITE
+        )
+
+        # Story separator.
+        divider_y = headline_end + 25
+
+        if divider_y > 700:
+            raise ValueError(
+                "Headline is too long for the available poster layout."
+            )
+
+        draw.line(
+            (80, divider_y, 1000, divider_y),
+            fill=self.GOLD,
+            width=3
+        )
+
+        # Original Urdu summary.
+        if summary:
+
+            summary_top = divider_y + 45
+            summary_space = 1220 - summary_top - 25
+
+            summary_font, summary_lines, summary_heights = (
+                self.fit_urdu(
+                    draw=draw,
+                    text=summary,
+                    max_width=900,
+                    max_height=summary_space,
+                    starting_size=39,
+                    minimum_size=24
+                )
+            )
+
+            self.draw_urdu(
+                draw,
+                summary_lines,
+                summary_heights,
+                summary_font,
+                summary_top,
+                self.MUTED
+            )
+
+        self.draw_footer(draw)
 
         os.makedirs(
             os.path.dirname(self.OUTPUT_PATH),
@@ -351,13 +490,16 @@ class DesignerAgent:
 
         image.save(
             self.OUTPUT_PATH,
-            "PNG",
+            format="PNG",
             optimize=True
         )
 
         print(
-            f"[DESIGNER] Poster successfully generated: "
-            f"{self.OUTPUT_PATH}"
+            "[DESIGNER] Urdu rendering completed successfully."
+        )
+
+        print(
+            f"[DESIGNER] Poster generated: {self.OUTPUT_PATH}"
         )
 
         return self.OUTPUT_PATH
