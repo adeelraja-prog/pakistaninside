@@ -1,57 +1,34 @@
 import os
 import time
-import json
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 
-class EditorAgent:
-    def __init__(self):
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            print("[Editor Warning] GEMINI_API_KEY missing. Using fallback.")
-            self.client = None
-        else:
-            self.client = genai.Client(api_key=api_key)
-
-    def process_story(self, raw_story):
-        if not self.client:
-            return {
-                'headline': raw_story['title'],
-                'urdu_text': raw_story['summary'],
-                'tag': 'BREAKING NEWS'
-            }
-
-        prompt = f"""
-        You are the lead editor of Pakistan Inside digital newsroom.
-        Analyze this raw news item:
-        Title: {raw_story['title']}
-        Summary: {raw_story['summary']}
-
-        Tasks:
-        1. Rewrite into a high-impact, viral Urdu News Headline (max 10-12 words).
-        2. Write a 2-line Urdu context explaining "The Story Behind The Story".
-        3. Assign an urgency tag: BREAKING, CONTROVERSY, DEBATE, or URGENT.
-
-        Return ONLY a JSON object matching this structure:
-        {{
-            "headline": "اردو سرخی",
-            "urdu_text": "تفصیل",
-            "tag": "TAG"
-        }}
-        """
-
+def generate_news_content(stories):
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise ValueError("GEMINI_API_KEY is missing from environment variables.")
+    
+    genai.configure(api_key=api_key)
+    
+    # Using the updated stable model with retry logic for 503 spikes
+    model = genai.GenerativeModel('gemini-3.8-flash')
+    
+    prompt = f"""
+    You are the Senior Editor for 'Pakistan Inside'. 
+    Analyze the following collected news stories, pick the most impactful one, 
+    and write a compelling, high-engagement Urdu headline and caption for social media.
+    
+    Stories:
+    {stories}
+    """
+    
+    max_retries = 3
+    for attempt in range(max_retries):
         try:
-            time.sleep(2)
-            response = self.client.models.generate_content(
-                model='gemini-3.8-flash',
-                contents=prompt,
-                config=types.GenerateContentConfig(response_mime_type="application/json")
-            )
-            return json.loads(response.text)
+            response = model.generate_content(prompt)
+            return response.text
         except Exception as e:
+            if "503" in str(e) and attempt < max_retries - 1:
+                time.sleep(3)
+                continue
             print(f"[Editor Error] Gemini API call failed: {e}")
-            return {
-                'headline': raw_story['title'],
-                'urdu_text': raw_story['summary'],
-                'tag': 'BREAKING'
-            }
+            raise e
