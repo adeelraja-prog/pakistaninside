@@ -1,108 +1,147 @@
 
 import os
+import re
+import hashlib
 from PIL import Image, ImageDraw, ImageFont, features
 
 
 class DesignerAgent:
+    WIDTH = 1080
+    HEIGHT = 1350
+
+    BACKGROUND = (12, 25, 22)
+    GREEN = (24, 57, 43)
+    GOLD = (218, 181, 99)
+    WHITE = (248, 246, 238)
+    MUTED = (183, 194, 184)
+
+    OUTPUT_PATH = "assets/output/latest_news_card.png"
+
+    FONT_PATHS = [
+        "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf",
+        "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ]
 
     def __init__(self):
-        self.output_dir = "assets/output"
-        os.makedirs(self.output_dir, exist_ok=True)
+        self.font_path = self._find_font()
 
-        self.width = 1080
-        self.height = 1080
-
-        self.background = (18, 22, 28)
-        self.white = (255, 255, 255)
-        self.red = (205, 35, 48)
-        self.gold = (245, 190, 55)
-        self.muted = (190, 195, 205)
-
-        self.font_paths = [
-            "assets/fonts/NotoNaskhArabic-Regular.ttf",
-            "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        ]
-
-        # Proper Urdu/Arabic shaping requires Pillow's RAQM support.
         if not features.check("raqm"):
             raise RuntimeError(
-                "Pillow does not have RAQM support. "
-                "Cannot safely render Urdu text."
+                "Pillow RAQM support is required for correct Urdu rendering."
             )
 
-        self.font_path = self.find_font()
+        print(f"[DESIGNER] Using font: {self.font_path}")
 
-    def find_font(self):
-        for path in self.font_paths:
+    def _find_font(self):
+        for path in self.FONT_PATHS:
             if os.path.isfile(path):
-                try:
-                    ImageFont.truetype(
-                        path,
-                        32,
-                        layout_engine=ImageFont.Layout.RAQM
-                    )
-                    print(f"[DESIGNER] Using font: {path}")
-                    return path
-                except Exception:
-                    continue
+                return path
 
-        raise RuntimeError(
-            "No suitable Urdu font found. "
-            "Install Noto Naskh Arabic or add it to assets/fonts."
+        raise FileNotFoundError(
+            "No suitable Urdu font found. Install Noto Naskh Arabic."
         )
 
-    def load_font(self, size):
+    def _font(self, size):
         return ImageFont.truetype(
             self.font_path,
             size,
             layout_engine=ImageFont.Layout.RAQM
         )
 
-    def text_width(self, draw, text, font):
-        return draw.textlength(
-            text,
-            font=font,
-            direction="rtl",
-            language="ur"
-        )
+    @staticmethod
+    def _clean(value):
+        if not value:
+            return ""
 
-    def wrap_urdu_text(self, draw, text, font, max_width):
-        words = str(text).split()
+        text = str(value)
+        text = re.sub(r"https?://\S+", "", text)
+        text = re.sub(r"www\.\S+", "", text)
+        text = re.sub(r"\s+", " ", text)
+        return text.strip()
+
+    @staticmethod
+    def _normalise(value):
+        value = str(value or "").lower()
+        value = re.sub(r"[^\w\s]", "", value)
+        return re.sub(r"\s+", " ", value).strip()
+
+    def _is_duplicate(self, first, second):
+        a = self._normalise(first)
+        b = self._normalise(second)
+
+        if not a or not b:
+            return True
+
+        if a == b or a in b or b in a:
+            return True
+
+        return False
+
+    def _remove_duplicate_sentences(self, text):
+        sentences = re.split(r"(?<=[۔.!؟])\s+", text)
+        result = []
+        seen = set()
+
+        for sentence in sentences:
+            sentence = sentence.strip()
+            key = self._normalise(sentence)
+
+            if key and key not in seen:
+                seen.add(key)
+                result.append(sentence)
+
+        return " ".join(result)
+
+    def _wrap_rtl(self, draw, text, font, max_width):
+        words = text.split()
         lines = []
-        current_line = ""
+        current = ""
 
         for word in words:
-            test_line = f"{current_line} {word}".strip()
+            test = f"{current} {word}".strip()
 
-            if self.text_width(draw, test_line, font) <= max_width:
-                current_line = test_line
+            bbox = draw.textbbox(
+                (0, 0),
+                test,
+                font=font,
+                direction="rtl",
+                language="ur"
+            )
+
+            width = bbox[2] - bbox[0]
+
+            if width <= max_width:
+                current = test
             else:
-                if current_line:
-                    lines.append(current_line)
+                if current:
+                    lines.append(current)
+                current = word
 
-                current_line = word
-
-        if current_line:
-            lines.append(current_line)
+        if current:
+            lines.append(current)
 
         return lines
 
-    def draw_rtl_lines(
+    def _draw_rtl_block(
         self,
         draw,
-        lines,
+        text,
+        y,
         font,
-        right,
-        top,
+        max_width,
         fill,
-        line_spacing=20
+        line_gap=20,
+        max_lines=None
     ):
-        y = top
+        lines = self._wrap_rtl(draw, text, font, max_width)
+
+        if max_lines:
+            lines = lines[:max_lines]
 
         for line in lines:
             draw.text(
-                (right, y),
+                (self.WIDTH - 85, y),
                 line,
                 font=font,
                 fill=fill,
@@ -112,173 +151,196 @@ class DesignerAgent:
             )
 
             bbox = draw.textbbox(
-                (right, y),
+                (0, 0),
                 line,
                 font=font,
-                anchor="ra",
                 direction="rtl",
                 language="ur"
             )
 
-            y += max(45, bbox[3] - bbox[1]) + line_spacing
+            y += (bbox[3] - bbox[1]) + line_gap
 
         return y
 
-    def generate_card(self, processed_data):
+    def _gradient_background(self):
+        image = Image.new(
+            "RGB",
+            (self.WIDTH, self.HEIGHT),
+            self.BACKGROUND
+        )
 
-        if not isinstance(processed_data, dict):
-            raise ValueError(
-                "Invalid editorial data supplied to Designer."
-            )
+        pixels = image.load()
 
-        headline = str(
-            processed_data.get("headline", "")
-        ).strip()
+        for y in range(self.HEIGHT):
+            ratio = y / self.HEIGHT
 
-        body = str(
-            processed_data.get("body", "")
-        ).strip()
+            for x in range(self.WIDTH):
+                glow = max(0, 1 - abs(x - 160) / 1000)
+                pixels[x, y] = (
+                    int(12 + 8 * ratio + 3 * glow),
+                    int(25 + 14 * ratio + 5 * glow),
+                    int(22 + 5 * ratio)
+                )
 
-        tag = str(
-            processed_data.get("tag", "PAKISTAN INSIDE")
-        ).strip()
+        return image
+
+    def _draw_brand(self, draw):
+        # Top editorial masthead: no enclosing box.
+        draw.text(
+            (85, 65),
+            "PI",
+            font=self._font(48),
+            fill=self.GOLD
+        )
+
+        draw.line(
+            (85, 132, 995, 132),
+            fill=self.GOLD,
+            width=3
+        )
+
+        draw.text(
+            (995, 70),
+            "PAKISTAN INSIDE",
+            font=self._font(48),
+            fill=self.WHITE,
+            anchor="ra"
+        )
+
+        draw.text(
+            (995, 145),
+            "THE STORY BEHIND THE STORY",
+            font=self._font(21),
+            fill=self.GOLD,
+            anchor="ra"
+        )
+
+    def _draw_bottom_brand(self, draw):
+        draw.line(
+            (85, 1230, 995, 1230),
+            fill=self.GOLD,
+            width=2
+        )
+
+        draw.text(
+            (995, 1260),
+            "PAKISTAN INSIDE",
+            font=self._font(25),
+            fill=self.GOLD,
+            anchor="ra"
+        )
+
+        draw.text(
+            (995, 1300),
+            "THE STORY BEHIND THE STORY",
+            font=self._font(17),
+            fill=self.MUTED,
+            anchor="ra"
+        )
+
+    def _prepare_content(self, data):
+        headline = self._clean(data.get("headline"))
+        urdu_text = self._clean(data.get("urdu_text"))
+        body = self._clean(data.get("body"))
 
         if not headline:
-            raise ValueError(
-                "Cannot design a card without a headline."
-            )
+            headline = urdu_text or body
 
-        if not body:
-            raise ValueError(
-                "Cannot design a card without news body text."
-            )
+        if not headline:
+            raise ValueError("No headline or story content supplied.")
 
-        img = Image.new(
-            "RGB",
-            (self.width, self.height),
-            self.background
+        # Never print the same text twice.
+        if self._is_duplicate(urdu_text, headline):
+            urdu_text = ""
+
+        if self._is_duplicate(body, headline):
+            body = ""
+
+        if urdu_text and body and self._is_duplicate(urdu_text, body):
+            body = ""
+
+        # Prefer the longer distinct editorial text.
+        summary = max(
+            [item for item in (urdu_text, body) if item],
+            key=len,
+            default=""
         )
 
-        draw = ImageDraw.Draw(img)
+        summary = self._remove_duplicate_sentences(summary)
 
-        # Header band
-        draw.rectangle(
-            [0, 0, self.width, 145],
-            fill=self.red
-        )
+        return headline, summary
 
-        brand_font = self.load_font(48)
+    def generate_card(self, edited_data):
+        if not isinstance(edited_data, dict):
+            raise ValueError("Designer expected editorial data as a dictionary.")
 
+        headline, summary = self._prepare_content(edited_data)
+
+        image = self._gradient_background()
+        draw = ImageDraw.Draw(image)
+
+        self._draw_brand(draw)
+
+        # Editorial accent, not a generic Breaking News banner.
         draw.text(
-            (55, 43),
-            "PAKISTAN INSIDE",
-            font=brand_font,
-            fill=self.white
-        )
-
-        # News category tag
-        draw.rounded_rectangle(
-            [55, 185, 520, 250],
-            radius=12,
-            fill=self.gold
-        )
-
-        tag_font = self.load_font(30)
-
-        draw.text(
-            (75, 198),
-            tag,
-            font=tag_font,
-            fill=(20, 20, 20),
+            (995, 235),
+            "خصوصی رپورٹ",
+            font=self._font(27),
+            fill=self.GOLD,
+            anchor="ra",
             direction="rtl",
             language="ur"
         )
 
-        # Headline
-        headline_font = self.load_font(68)
+        # Main headline.
+        headline_font = self._font(65)
+        headline_y = 310
 
-        headline_lines = self.wrap_urdu_text(
+        headline_end = self._draw_rtl_block(
             draw,
             headline,
+            headline_y,
             headline_font,
-            950
+            900,
+            self.WHITE,
+            line_gap=25,
+            max_lines=5
         )
 
-        headline_end = self.draw_rtl_lines(
-            draw,
-            headline_lines[:4],
-            headline_font,
-            1025,
-            310,
-            self.white,
-            22
+        # A restrained gold separator.
+        separator_y = min(headline_end + 35, 790)
+
+        draw.line(
+            (85, separator_y, 995, separator_y),
+            fill=self.GOLD,
+            width=3
         )
 
-        # Divider
-        divider_y = min(
-            max(headline_end + 20, 600),
-            690
-        )
+        # Original editorial summary: shown only once.
+        if summary:
+            summary_font = self._font(37)
 
-        draw.rectangle(
-            [55, divider_y, 1025, divider_y + 5],
-            fill=self.red
-        )
-
-        # News summary
-        body_font = self.load_font(43)
-
-        body_lines = self.wrap_urdu_text(
-            draw,
-            body,
-            body_font,
-            950
-        )
-
-        self.draw_rtl_lines(
-            draw,
-            body_lines[:7],
-            body_font,
-            1025,
-            divider_y + 45,
-            self.muted,
-            14
-        )
-
-        # Footer band
-        draw.rectangle(
-            [0, 1000, self.width, self.height],
-            fill=(10, 13, 18)
-        )
-
-        footer_font = self.load_font(27)
-
-        draw.text(
-            (55, 1030),
-            "THE STORY BEHIND THE STORY",
-            font=footer_font,
-            fill=self.gold
-        )
-
-        card_path = os.path.join(
-            self.output_dir,
-            "latest_news_card.png"
-        )
-
-        img.save(card_path, format="PNG")
-
-        if not os.path.isfile(card_path):
-            raise RuntimeError(
-                "News graphic could not be saved."
+            self._draw_rtl_block(
+                draw,
+                summary,
+                separator_y + 55,
+                summary_font,
+                900,
+                self.MUTED,
+                line_gap=19,
+                max_lines=8
             )
 
-        if os.path.getsize(card_path) == 0:
-            raise RuntimeError(
-                "Generated news graphic is empty."
-            )
+        self._draw_bottom_brand(draw)
 
-        print(
-            f"[DESIGNER] News graphic generated: {card_path}"
+        os.makedirs(os.path.dirname(self.OUTPUT_PATH), exist_ok=True)
+
+        image.save(
+            self.OUTPUT_PATH,
+            format="PNG",
+            optimize=True
         )
 
-        return card_path
+        print(f"[DESIGNER] News graphic generated: {self.OUTPUT_PATH}")
+
+        return self.OUTPUT_PATH
