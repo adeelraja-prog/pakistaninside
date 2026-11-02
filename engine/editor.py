@@ -24,7 +24,8 @@ class EditorAgent:
         {{
             "tag": "BREAKING NEWS",
             "headline": "Short punchy Urdu headline",
-            "body": "Detailed Urdu summary paragraph for social media"
+            "urdu_text": "Detailed Urdu summary paragraph for social media post body",
+            "body": "Short Urdu description text for the graphical image card"
         }}
 
         Stories:
@@ -36,7 +37,8 @@ class EditorAgent:
             try:
                 response = self.model.generate_content(prompt)
                 cleaned_text = response.text.strip()
-                # Remove Markdown block wrappers if Gemini adds them
+                
+                # Clean Markdown wrappers if present
                 if cleaned_text.startswith("```"):
                     cleaned_text = cleaned_text.split("```")[1]
                     if cleaned_text.startswith("json"):
@@ -44,13 +46,21 @@ class EditorAgent:
                 cleaned_text = cleaned_text.strip()
                 
                 parsed_json = json.loads(cleaned_text)
+                
+                # Ensure fallback for urdu_text if missing
+                if "urdu_text" not in parsed_json:
+                    parsed_json["urdu_text"] = parsed_json.get("body", "")
+                if "body" not in parsed_json:
+                    parsed_json["body"] = parsed_json.get("urdu_text", "")
+                    
                 return parsed_json
             except json.JSONDecodeError:
-                # Fallback dictionary if JSON parsing fails
+                text_content = response.text.strip()
                 return {
                     "tag": "PAKISTAN INSIDE",
-                    "headline": "اہم پیش رفت",
-                    "body": response.text.strip()
+                    "headline": "پاکستان کی اہم خبر",
+                    "urdu_text": text_content,
+                    "body": text_content
                 }
             except Exception as e:
                 if "503" in str(e) and attempt < max_retries - 1:
