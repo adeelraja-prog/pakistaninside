@@ -16,6 +16,10 @@ class EditorAgent:
         """Standard execution method called by main.py"""
         return self.generate_news_content(stories)
 
+    def process_story(self, story):
+        """Compatibility wrapper for main.py calling process_story"""
+        return self.generate_news_content(story)
+
     def generate_news_content(self, stories):
         prompt = f"""
         You are the Senior Editor for 'Pakistan Inside'. 
