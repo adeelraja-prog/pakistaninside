@@ -82,8 +82,18 @@ jobs:
           FACEBOOK_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID }}
           GEMINI_MODEL: gemini-3.8-flash
           FACEBOOK_GRAPH_API_VERSION: v26.0
+          PUBLISH_TO_FACEBOOK: "true"
         run: |
           python main.py
+
+      - name: Save Generated Poster
+        if: always() && inputs.preflight_only == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: pakistan-inside-poster
+          path: assets/output/latest_news_card.png
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Confirm Preflight Completed
         if: ${{ inputs.preflight_only == true }}
