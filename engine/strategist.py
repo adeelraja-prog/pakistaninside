@@ -1,46 +1,143 @@
+
 import os
 import requests
 
+
 class StrategistAgent:
+
     def __init__(self):
         self.page_id = os.getenv("FACEBOOK_PAGE_ID")
         self.access_token = os.getenv("FACEBOOK_PAGE_ACCESS_TOKEN")
 
+        # Current Graph API version.
+        # Can be changed through GitHub Actions environment variables.
+        self.api_version = os.getenv(
+            "FACEBOOK_GRAPH_API_VERSION",
+            "v26.0"
+        )
+
+        self.base_url = (
+            f"https://graph.facebook.com/{self.api_version}"
+        )
+
+        self.timeout = 60
+
     def run(self, image_path, caption):
-        """Standard execution method called by main.py"""
         return self.publish_to_facebook(image_path, caption)
 
     def publish_to_facebook(self, image_path, caption):
+
+        # Check Facebook credentials.
         if not self.page_id or not self.access_token:
-            print("🔥 [Agent 4: Strategist] FB Tokens missing. Running in dry-run mode.")
-            return {"dry_run": True}
-        
-        # Facebook Graph API Photos Endpoint
-        url = f"https://graph.facebook.com/v19.0/{self.page_id}/photos"
-        
+            return {
+                "error": "Facebook Page ID or Page Access Token is missing."
+            }
+
+        # Check image.
+        if not image_path or not os.path.isfile(image_path):
+            return {
+                "error": f"Image file does not exist: {image_path}"
+            }
+
+        file_size = os.path.getsize(image_path)
+
+        if file_size == 0:
+            return {
+                "error": "Generated image file is empty."
+            }
+
+        url = f"{self.base_url}/{self.page_id}/photos"
+
         payload = {
-            'caption': caption,
-            'access_token': self.access_token
+            "caption": caption,
+            "published": "true",
+            "access_token": self.access_token
         }
-        
+
         try:
-            with open(image_path, 'rb') as img_file:
-                files = {'source': img_file}
-                response = requests.post(url, data=payload, files=files)
-                res_json = response.json()
-                
-                if "id" in res_json or "post_id" in res_json:
-                    print(f"🎉 [Agent 4: Strategist] LIVE POST SUCCESSFUL! Post ID: {res_json}")
-                else:
-                    print(f"❌ [Agent 4: Strategist Error] FB Returned Error Response: {res_json}")
-                    
-                return res_json
-        except Exception as e:
-            print(f"💥 [Agent 4: Strategist Exception] Failed: {e}")
-            return {"error": str(e)}
+            print("[STRATEGIST] Connecting to Facebook Pages API...")
+
+            with open(image_path, "rb") as image_file:
+
+                files = {
+                    "source": (
+                        os.path.basename(image_path),
+                        image_file,
+                        "image/png"
+                    )
+                }
+
+                response = requests.post(
+                    url,
+                    data=payload,
+                    files=files,
+                    timeout=self.timeout
+                )
+
+            try:
+                result = response.json()
+            except ValueError:
+                return {
+                    "error": (
+                        "Facebook returned a non-JSON response. "
+                        f"HTTP status: {response.status_code}"
+                    )
+                }
+
+            # Facebook API errors.
+            if response.status_code >= 400 or "error" in result:
+
+                error_details = result.get("error", {})
+
+                print(
+                    "[STRATEGIST ERROR] Facebook publishing failed: "
+                    f"{error_details}"
+                )
+
+                return {
+                    "error": error_details or result,
+                    "http_status": response.status_code
+                }
+
+            # Verify Facebook actually created the post.
+            if not result.get("id") and not result.get("post_id"):
+                return {
+                    "error": (
+                        "Facebook response did not contain a photo ID "
+                        "or post ID."
+                    ),
+                    "response": result
+                }
+
+            print(
+                "[STRATEGIST] Facebook publishing confirmed. "
+                f"Response: {result}"
+            )
+
+            return result
+
+        except requests.Timeout:
+            return {
+                "error": (
+                    "Facebook request timed out. "
+                    "Check the Page before retrying to avoid duplicates."
+                )
+            }
+
+        except requests.RequestException as exc:
+            return {
+                "error": f"Facebook network request failed: {exc}"
+            }
+
+        except Exception as exc:
+            return {
+                "error": (
+                    f"Unexpected Facebook publishing error: "
+                    f"{type(exc).__name__}: {exc}"
+                )
+            }
 
     @classmethod
     def publish(cls, image_path, caption):
-        """Compatibility wrapper for static calls"""
         agent = cls()
         return agent.publish_to_facebook(image_path, caption)
