@@ -1,6 +1,7 @@
 
 import os
 import json
+import time
 
 from google import genai
 
@@ -26,8 +27,6 @@ class EditorAgent:
                 "GEMINI_API_KEY is missing from GitHub Actions secrets."
             )
 
-        # Keep the existing Gemini model.
-        # It can be changed later through the GEMINI_MODEL environment variable.
         self.model_name = os.getenv(
             "GEMINI_MODEL",
             "gemini-3.8-flash"
@@ -78,37 +77,74 @@ NEWS STORY:
 {stories_json}
 """
 
-        try:
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt,
-                config={
-                    "response_mime_type": "application/json"
-                }
-            )
+        response = None
+        retry_delays = [30, 60, 120]
 
-        except Exception as exc:
-            error_message = str(exc)
-            error_lower = error_message.lower()
+        for attempt in range(4):
+            try:
+                print(
+                    f"[EDITOR] Gemini request "
+                    f"attempt {attempt + 1}/4..."
+                )
 
-            # Detect exhausted daily free-tier quota.
-            daily_quota_exhausted = (
-                "free_tier_requests" in error_lower
-                or "per day" in error_lower
-                or "requestsperday" in error_lower
-            )
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt,
+                    config={
+                        "response_mime_type": "application/json"
+                    }
+                )
 
-            if daily_quota_exhausted:
-                raise GeminiQuotaExceededError(
-                    "Gemini free-tier daily quota is exhausted. "
-                    "No paid API fallback will be used. "
-                    "Wait for the quota reset before trying again. "
-                    f"Details: {error_message}"
+                break
+
+            except Exception as exc:
+                error_message = str(exc)
+                error_lower = error_message.lower()
+
+                daily_quota_exhausted = (
+                    "free_tier_requests" in error_lower
+                    or "per day" in error_lower
+                    or "requestsperday" in error_lower
+                )
+
+                if daily_quota_exhausted:
+                    raise GeminiQuotaExceededError(
+                        "Gemini free-tier daily quota is exhausted. "
+                        "No paid API fallback will be used. "
+                        "Wait for the quota reset. "
+                        f"Details: {error_message}"
+                    ) from exc
+
+                temporary_error = (
+                    "503" in error_message
+                    or "unavailable" in error_lower
+                    or "overloaded" in error_lower
+                    or "500" in error_message
+                    or "internal server error" in error_lower
+                    or "502" in error_message
+                    or "504" in error_message
+                    or "deadline exceeded" in error_lower
+                )
+
+                if temporary_error and attempt < 3:
+                    delay = retry_delays[attempt]
+
+                    print(
+                        f"[GEMINI RETRY] Temporary service error. "
+                        f"Retrying in {delay} seconds..."
+                    )
+
+                    time.sleep(delay)
+                    continue
+
+                raise GeminiAPIError(
+                    f"Gemini request failed: {error_message}"
                 ) from exc
 
+        if response is None:
             raise GeminiAPIError(
-                f"Gemini request failed: {error_message}"
-            ) from exc
+                "Gemini failed after all retry attempts."
+            )
 
         raw_text = response.text
 
@@ -120,7 +156,6 @@ NEWS STORY:
         try:
             cleaned_text = raw_text.strip()
 
-            # Remove Markdown fences if Gemini includes them.
             if cleaned_text.startswith("```"):
                 cleaned_text = cleaned_text.split("```", 2)[1].strip()
 
@@ -164,6 +199,8 @@ NEWS STORY:
             raise GeminiOutputError(
                 "Gemini did not provide a valid graphic description."
             )
+
+        print("[EDITOR] Gemini successfully generated Urdu content.")
 
         return {
             "tag": str(parsed_data.get("tag") or "PAKISTAN INSIDE"),
