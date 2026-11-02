@@ -1,6 +1,7 @@
-
 import os
+import re
 import sys
+from pathlib import Path
 
 from engine.scout import ScoutAgent
 from engine.editor import (
@@ -13,142 +14,354 @@ from engine.designer import DesignerAgent
 from engine.strategist import StrategistAgent
 
 
-def create_source_fallback(story):
-    """Create a neutral, source-attributed graphic without inventing news."""
+# ---------------------------------------------------------
+# CONFIGURATION
+# ---------------------------------------------------------
 
-    headline = str(story.get("title", "")).strip()
-    summary = str(story.get("summary", "")).strip()
-    source = str(story.get("source", "Original source")).strip()
-    link = str(story.get("link", "")).strip()
+OUTPUT_PATH = Path("assets/output/latest_news_card.png")
 
-    if not headline or not link:
-        raise ValueError("Story has no usable headline or source link.")
+PUBLISH_TO_FACEBOOK = (
+    os.getenv("PUBLISH_TO_FACEBOOK", "false").strip().lower() == "true"
+)
 
-    return {
+BRAND_HASHTAGS = "#PakistanInside #AdeelRaja"
+
+
+# ---------------------------------------------------------
+# CONTENT VALIDATION
+# ---------------------------------------------------------
+
+URDU_PATTERN = re.compile(
+    r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]"
+)
+
+URL_PATTERN = re.compile(
+    r"https?://|www\.",
+    re.IGNORECASE
+)
+
+FORBIDDEN_PHRASES = [
+    "ماخذ کا لنک",
+    "اصل خبر",
+    "مکمل خبر کے لیے",
+    "تفصیلات کے لیے ماخذ",
+    "مزید تفصیلات کے لیے لنک",
+    "source link",
+    "read more",
+    "click here",
+    "visit the source",
+]
+
+
+class EditorialValidationError(Exception):
+    """Raised when Gemini output is not suitable for publication."""
+
+
+def contains_urdu(text):
+    return bool(URDU_PATTERN.search(str(text or "")))
+
+
+def validate_public_text(text, field_name, minimum_length=10):
+    """
+    Validate text intended for the public poster or Facebook caption.
+    """
+
+    if not isinstance(text, str):
+        raise EditorialValidationError(
+            f"{field_name} is missing or is not text."
+        )
+
+    text = text.strip()
+
+    if len(text) < minimum_length:
+        raise EditorialValidationError(
+            f"{field_name} is too short."
+        )
+
+    if not contains_urdu(text):
+        raise EditorialValidationError(
+            f"{field_name} does not contain Urdu script."
+        )
+
+    if URL_PATTERN.search(text):
+        raise EditorialValidationError(
+            f"{field_name} contains a URL. Source links must remain internal."
+        )
+
+    lowered = text.lower()
+
+    for phrase in FORBIDDEN_PHRASES:
+        if phrase.lower() in lowered:
+            raise EditorialValidationError(
+                f"{field_name} contains prohibited placeholder wording."
+            )
+
+    return text
+
+
+def validate_editorial_output(edited_data):
+    """
+    Only accept original Urdu editorial output.
+    Never substitute RSS headlines, source links, or fallback text.
+    """
+
+    if not isinstance(edited_data, dict):
+        raise EditorialValidationError(
+            "Editor did not return a valid editorial object."
+        )
+
+    headline = validate_public_text(
+        edited_data.get("headline"),
+        "Urdu headline",
+        minimum_length=8,
+    )
+
+    urdu_text = validate_public_text(
+        edited_data.get("urdu_text"),
+        "Urdu editorial summary",
+        minimum_length=20,
+    )
+
+    body = validate_public_text(
+        edited_data.get("body"),
+        "Urdu story body",
+        minimum_length=30,
+    )
+
+    # Do not pass source metadata or RSS links to the Designer.
+    # Only approved editorial fields are allowed through.
+    approved_data = {
+        "tag": str(edited_data.get("tag", "") or "").strip(),
         "headline": headline,
-        "urdu_text": "اصل خبر اور مکمل تفصیلات کے لیے ماخذ کا لنک ملاحظہ کریں۔",
-        "body": summary or headline,
-        "source": source,
-        "link": link,
+        "urdu_text": urdu_text,
+        "body": body,
     }
 
+    return approved_data
 
-def run_newsroom():
 
-    print("==================================================")
-    print("PAKISTAN INSIDE - COMMAND & CONTROL ENGINE")
-    print("==================================================")
+# ---------------------------------------------------------
+# FACEBOOK CAPTION
+# ---------------------------------------------------------
+
+def create_facebook_caption(edited_data):
+    """
+    Create a caption exclusively from approved Urdu editorial content.
+    No RSS headline, source name, URL, or generic fallback is included.
+    """
+
+    headline = edited_data["headline"]
+    urdu_text = edited_data["urdu_text"]
+
+    caption = (
+        f"{headline}\n\n"
+        f"{urdu_text}\n\n"
+        f"{BRAND_HASHTAGS}"
+    )
+
+    # Final safety check before publishing.
+    if URL_PATTERN.search(caption):
+        raise EditorialValidationError(
+            "Facebook caption contains a URL."
+        )
+
+    if not contains_urdu(caption):
+        raise EditorialValidationError(
+            "Facebook caption does not contain Urdu."
+        )
+
+    return caption
+
+
+# ---------------------------------------------------------
+# MAIN NEWSROOM PIPELINE
+# ---------------------------------------------------------
+
+def main():
+
+    print("\n" + "=" * 60)
+    print("PAKISTAN INSIDE — NEWSROOM AUTOMATION")
+    print("THE STORY BEHIND THE STORY")
+    print("=" * 60)
+
+    print(
+        f"\n[CONFIG] Facebook publishing: "
+        f"{'ENABLED' if PUBLISH_TO_FACEBOOK else 'DISABLED'}"
+    )
 
     try:
-        scout = ScoutAgent()
-        editor = EditorAgent()
-        designer = DesignerAgent()
-        strategist = StrategistAgent()
 
-        # AGENT 1: SCOUT
+        # -------------------------------------------------
+        # AGENT 1 — SCOUT
+        # -------------------------------------------------
+
+        print("\n[AGENT 1: SCOUT] Collecting news...")
+
+        scout = ScoutAgent()
         raw_stories = scout.run()
 
         if not raw_stories:
-            print("[NEWSROOM] No stories found.")
-            return False
+            raise RuntimeError(
+                "Scout did not collect any news stories."
+            )
 
-        print(f"[SCOUT] Collected {len(raw_stories)} stories.")
-        print("[NEWSROOM] Testing the first collected story.")
-
-        story = raw_stories[0]
-
-        # AGENT 2: EDITOR
-        try:
-            edited_data = editor.process_story(story)
-            print("[EDITOR] Gemini successfully prepared the story.")
-
-        except GeminiQuotaExceededError as exc:
-            print("[EDITOR] Gemini quota exhausted.")
-            print("[EDITOR] Using source-based fallback.")
-            print(str(exc))
-
-            edited_data = create_source_fallback(story)
-
-        required_fields = ["headline", "urdu_text", "body"]
-
-        for field in required_fields:
-            if not edited_data.get(field):
-                raise ValueError(
-                    f"Editorial output is missing required field: {field}"
-                )
-
-        # AGENT 3: DESIGNER
-        card_path = designer.generate_card(edited_data)
-
-        if not card_path or not os.path.isfile(card_path):
-            raise RuntimeError("Designer did not generate a valid image.")
-
-        print(f"[DESIGNER] Poster successfully generated: {card_path}")
-
-        # SAFE TEST: Do not publish until duplicate protection is implemented.
-        publish_enabled = os.getenv(
-            "PUBLISH_TO_FACEBOOK", "false"
-        ).lower() in ("true", "1", "yes")
-
-        if not publish_enabled:
-            print("[SAFE TEST] Facebook publishing is disabled.")
-            print("[SAFE TEST] Poster generation test completed.")
-            return True
-
-        # AGENT 4: STRATEGIST
-        source = str(story.get("source", "Source")).strip()
-        link = str(story.get("link", "")).strip()
-
-        caption = (
-            f"{edited_data['headline']}\n\n"
-            f"{edited_data['urdu_text']}\n\n"
-            f"Source: {source}\n"
-            f"{link}\n\n"
-            "#PakistanInside #Pakistan"
+        print(
+            f"[SCOUT] Collected {len(raw_stories)} stories."
         )
 
-        result = strategist.publish_to_facebook(card_path, caption)
+        # One story per run until the editorial pipeline
+        # has been reviewed and approved.
+        story = raw_stories[0]
 
-        if not isinstance(result, dict):
-            raise RuntimeError("Facebook returned an unexpected response.")
+        if not isinstance(story, dict):
+            raise RuntimeError(
+                "Scout returned an invalid story format."
+            )
 
-        if result.get("dry_run"):
-            print("[PUBLISHING] Dry run only.")
-            return False
+        print(
+            "[SCOUT] Selected one story for editorial processing."
+        )
 
-        if result.get("error"):
-            print(f"[PUBLISHING FAILED] {result['error']}")
-            return False
+        # -------------------------------------------------
+        # AGENT 2 — EDITOR
+        # -------------------------------------------------
 
-        post_id = result.get("post_id") or result.get("id")
+        print("\n[AGENT 2: EDITOR] Generating original Urdu journalism...")
+
+        editor = EditorAgent()
+
+        # Source information is provided internally to the Editor.
+        # It must not automatically become public-facing content.
+        edited_data = editor.process_story(story)
+
+        # Stop immediately if the Editor output is not suitable.
+        approved_data = validate_editorial_output(edited_data)
+
+        print("[EDITOR] Urdu editorial content passed validation.")
+        print("[EDITOR] Original Urdu headline approved.")
+
+        # -------------------------------------------------
+        # AGENT 3 — DESIGNER
+        # -------------------------------------------------
+
+        print("\n[AGENT 3: DESIGNER] Creating branded news poster...")
+
+        designer = DesignerAgent()
+
+        # Only approved Urdu editorial fields reach the Designer.
+        card_path = designer.generate_card(approved_data)
+
+        if not card_path:
+            raise RuntimeError(
+                "Designer did not return a poster path."
+            )
+
+        card_path = Path(card_path)
+
+        if not card_path.is_file():
+            raise RuntimeError(
+                f"Poster file was not created: {card_path}"
+            )
+
+        print(f"[DESIGNER] Poster generated: {card_path}")
+
+        # -------------------------------------------------
+        # AGENT 4 — STRATEGIST / PUBLISHER
+        # -------------------------------------------------
+
+        caption = create_facebook_caption(approved_data)
+
+        if not PUBLISH_TO_FACEBOOK:
+
+            print("\n[STRATEGIST] Facebook publishing is disabled.")
+            print("[STRATEGIST] Poster generated but NOT published.")
+            print(f"[OUTPUT] {card_path}")
+
+            return
+
+        print("\n[AGENT 4: STRATEGIST] Publishing approved content...")
+
+        strategist = StrategistAgent()
+
+        result = strategist.publish_to_facebook(
+            str(card_path),
+            caption
+        )
+
+        if not result:
+            raise RuntimeError(
+                "Facebook publisher returned no confirmation."
+            )
+
+        if isinstance(result, dict):
+            post_id = (
+                result.get("post_id")
+                or result.get("id")
+            )
+        else:
+            post_id = None
 
         if not post_id:
             raise RuntimeError(
-                f"Facebook did not confirm a post ID: {result}"
+                "Facebook publishing was not confirmed. "
+                "No successful post ID was returned."
             )
 
-        print(f"[PUBLISHING SUCCESS] Facebook Post ID: {post_id}")
-        return True
+        print("\n" + "=" * 60)
+        print("[PUBLISHING SUCCESS]")
+        print(f"Facebook Post ID: {post_id}")
+        print("=" * 60)
 
-    except GeminiQuotaExceededError as exc:
-        print(f"[GEMINI QUOTA ERROR] {exc}")
-        return False
+    except GeminiQuotaExceededError as error:
 
-    except GeminiAPIError as exc:
-        print(f"[GEMINI ERROR] {exc}")
-        return False
+        print("\n[NEWSROOM PAUSED]")
+        print("[EDITOR] Gemini free-tier quota has been exhausted.")
+        print("[SAFETY] No fallback content will be generated.")
+        print("[SAFETY] No poster will be published.")
+        print(f"[DETAILS] {error}")
 
-    except GeminiOutputError as exc:
-        print(f"[EDITORIAL OUTPUT ERROR] {exc}")
-        return False
+        sys.exit(1)
 
-    except Exception as exc:
-        print(f"[NEWSROOM ERROR] {type(exc).__name__}: {exc}")
-        return False
+    except GeminiAPIError as error:
 
+        print("\n[NEWSROOM STOPPED]")
+        print("[EDITOR] Gemini API error.")
+        print("[SAFETY] No fallback content will be generated.")
+        print("[SAFETY] Facebook publishing stopped.")
+        print(f"[DETAILS] {error}")
+
+        sys.exit(1)
+
+    except GeminiOutputError as error:
+
+        print("\n[NEWSROOM STOPPED]")
+        print("[EDITOR] Gemini returned invalid editorial output.")
+        print("[SAFETY] No fallback content will be generated.")
+        print("[SAFETY] Facebook publishing stopped.")
+        print(f"[DETAILS] {error}")
+
+        sys.exit(1)
+
+    except EditorialValidationError as error:
+
+        print("\n[EDITORIAL QUALITY CHECK FAILED]")
+        print(f"[REASON] {error}")
+        print("[SAFETY] Designer and Facebook Publisher were not called.")
+
+        sys.exit(1)
+
+    except Exception as error:
+
+        print("\n[NEWSROOM ERROR]")
+        print(f"[ERROR] {type(error).__name__}: {error}")
+        print("[SAFETY] Pipeline stopped. No fallback content will be published.")
+
+        sys.exit(1)
+
+
+# ---------------------------------------------------------
+# ENTRY POINT
+# ---------------------------------------------------------
 
 if __name__ == "__main__":
-    success = run_newsroom()
-
-    if not success:
-        sys.exit(1)
+    main()
