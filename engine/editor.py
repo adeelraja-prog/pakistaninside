@@ -28,7 +28,7 @@ class EditorAgent:
 
         prompt = self._build_prompt(stories, language)
 
-        for attempt in range(3):
+        for attempt in range(5):
             try:
                 response = self.client.models.generate_content(
                     model=self.model,
@@ -60,9 +60,12 @@ class EditorAgent:
                 err = str(e).lower()
                 if "free_tier" in err or "quota" in err or "resource_exhausted" in err:
                     raise GeminiQuotaExceededError("Quota exhausted")
-                if attempt == 2:
+                if attempt == 4:
                     raise GeminiAPIError(str(e))
-                time.sleep(15 * (attempt + 1))
+                # Longer backoff for 503 / high demand
+                wait = 30 * (attempt + 1)
+                print(f"[Editor] Temporary error, retrying in {wait}s... ({e})")
+                time.sleep(wait)
 
         raise GeminiAPIError("Failed after retries")
 
