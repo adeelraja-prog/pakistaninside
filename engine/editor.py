@@ -20,7 +20,7 @@ class EditorAgent:
         if not api_key:
             raise RuntimeError("GEMINI_API_KEY missing")
         self.client = genai.Client(api_key=api_key)
-        self.model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+        self.model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 
     def process_stories(self, stories, language="ur"):
         if not stories:
