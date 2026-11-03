@@ -1,17 +1,13 @@
 {
-    "brand_name": "Pakistan Inside",
-    "facebook_page_url": "https://www.facebook.com/PakistanInsidewithar/",
-    "rss_feeds": [
-        "https://www.geo.tv/rss/1/1",
-        "https://arynews.tv/feed/",
-        "https://www.dawn.com/feeds/home/",
-        "https://express.pk/feed/"
-    ],
-    "monitored_x_handles": [
-        "tuckercarlson",
-        "Siasatpk",
-        "ImranKhanPTI",
-        "HamidMirPAK"
-    ],
-    "posting_interval_minutes": 20
+  "brand_name": "Pakistan Inside",
+  "rss_feeds": [
+    "https://www.geo.tv/rss/1/1",
+    "https://arynews.tv/feed/",
+    "https://www.dawn.com/feeds/home/",
+    "https://express.pk/feed/",
+    "https://www.thenews.com.pk/rss/1/1",
+    "https://tribune.com.pk/feed/",
+    "https://propakistani.pk/feed/"
+  ],
+  "posting_interval_minutes": 45
 }
