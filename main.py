@@ -18,21 +18,20 @@ def main():
     strategist = StrategistAgent()
 
     language = "ur"
+    processed = None
     try:
-        processed = editor.process_stories(stories[:12], language="ur")
+        processed = editor.process_stories(stories[:6], language="ur")
     except GeminiQuotaExceededError:
-        print("[FALLBACK] Urdu quota exhausted. Switching to English.")
-        language = "en"
-        processed = editor.process_stories(stories[:8], language="en")
+        print("[FALLBACK] Quota exhausted. Using simple English cards (no Gemini).")
+        processed = editor.fallback_stories(stories)
     except Exception as e:
         print(f"[Editor failed] {e}")
-        print("[FALLBACK] Trying English mode...")
-        try:
-            processed = editor.process_stories(stories[:8], language="en")
-        except Exception as e2:
-            print(f"[English also failed] {e2}")
-            print("No content generated this run.")
-            return
+        print("[FALLBACK] Using simple English cards (no Gemini).")
+        processed = editor.fallback_stories(stories)
+
+    if not processed:
+        print("No content generated this run.")
+        return
 
     for item in processed[:3]:  # Limit posts per run
         try:
