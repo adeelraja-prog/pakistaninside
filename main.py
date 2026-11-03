@@ -24,6 +24,15 @@ def main():
         print("[FALLBACK] Urdu quota exhausted. Switching to English.")
         language = "en"
         processed = editor.process_stories(stories[:8], language="en")
+    except Exception as e:
+        print(f"[Editor failed] {e}")
+        print("[FALLBACK] Trying English mode...")
+        try:
+            processed = editor.process_stories(stories[:8], language="en")
+        except Exception as e2:
+            print(f"[English also failed] {e2}")
+            print("No content generated this run.")
+            return
 
     for item in processed[:3]:  # Limit posts per run
         try:
