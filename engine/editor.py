@@ -109,7 +109,23 @@ Stories:
 {stories_json}
 """
 
-    def _validate_item(self, item, language):
+    def fallback_stories(self, stories):
+        """No Gemini. Simple English cards from raw titles."""
+        results = []
+        for s in stories[:3]:
+            title = s.get("title", "News Update")
+            summary = s.get("summary", "")[:180]
+            results.append({
+                "tag": "GENERAL",
+                "headline": title,
+                "urdu_text": "",
+                "english_text": summary,
+                "body": summary,
+                "source_name": s.get("source", "Source"),
+                "source_attribution": "Source News",
+                "language": "en",
+            })
+        return results
         if not isinstance(item, dict):
             raise GeminiOutputError("Invalid item")
 
