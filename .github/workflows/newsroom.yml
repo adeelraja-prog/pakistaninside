@@ -3,6 +3,7 @@ name: Pakistan Inside Newsroom
 on:
   schedule:
     - cron: '0,45 * * * *'
+  pull_request:
   workflow_dispatch:
     inputs:
       publish:
