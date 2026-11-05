@@ -17,14 +17,15 @@ class GeminiOutputError(Exception):
 class EditorAgent:
     def __init__(self):
         api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            raise RuntimeError("GEMINI_API_KEY missing")
-        self.client = genai.Client(api_key=api_key)
+        self.client = genai.Client(api_key=api_key) if api_key else None
         self.model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 
     def process_stories(self, stories, language="ur"):
         if not stories:
             raise ValueError("No stories provided")
+
+        if self.client is None:
+            raise GeminiAPIError("GEMINI_API_KEY missing; using source-headline fallback")
 
         prompt = self._build_prompt(stories, language)
 
@@ -126,6 +127,8 @@ Stories:
                 "language": "en",
             })
         return results
+
+    def _validate_item(self, item, language):
         if not isinstance(item, dict):
             raise GeminiOutputError("Invalid item")
 
