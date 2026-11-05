@@ -24,7 +24,7 @@ class DesignerAgent:
     MUTED = (205, 215, 207)
 
     def __init__(self):
-        self.urdu_font_path = self._find_font("Nastaliq")
+        self.urdu_font_path = (self._find_font("Nastaliq") or self._find_font("NaskhArabic") or self._find_font("Arabic"))
         self.english_font_path = self._find_font("DejaVu")
         if not features.check("raqm"):
             print("[DESIGNER] Warning: RAQM not available, Urdu may render poorly")
