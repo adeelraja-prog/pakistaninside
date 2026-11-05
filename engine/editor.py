@@ -126,6 +126,8 @@ Stories:
                 "language": "en",
             })
         return results
+
+    def _validate_item(self, item, language):
         if not isinstance(item, dict):
             raise GeminiOutputError("Invalid item")
 
