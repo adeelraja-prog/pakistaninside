@@ -77,6 +77,8 @@ class EditorAgent:
                         "impact_score": original.get("impact_score", 0),
                         "urgency": original.get("urgency", "NORMAL"),
                         "topics": original.get("topics", []),
+                        "source_count": original.get("source_count", 1),
+                        "corroborating_sources": original.get("corroborating_sources", [original.get("source", "News source")]),
                     })
                     validated.append(clean)
                 return validated
@@ -107,6 +109,7 @@ EDITORIAL RULES:
 - Do not automatically favour government press releases. Routine ceremonial announcements, minor appointments and self-congratulatory press releases are low priority unless they have material public consequences.
 - Do not suppress a story because it criticises or supports a political party. Apply the same evidence and public-interest standards to all sides.
 - Never invent facts, names, quotes, dates, figures, legal outcomes or source attribution.
+- Treat source_count and corroborating_sources as metadata, not proof by themselves. State independent confirmation only when the supplied sources genuinely support the same fact.
 - Distinguish allegations, claims, court observations, orders and final judgments.
 - Do not label a story BREAKING unless the supplied evidence supports urgency and recency.
 - If the source material is insufficient, say so in the text or exclude the item.
