@@ -18,6 +18,32 @@ class NewsroomRegressionTests(unittest.TestCase):
         self.assertIn("PUBLIC_INTEREST", ranked["topics"])
         self.assertGreater(ranked["impact_score"], 0)
 
+    def test_breaking_label_requires_fresh_timestamp(self):
+        scout = ScoutAgent.__new__(ScoutAgent)
+        from datetime import datetime, timezone, timedelta
+        stale = {
+            "title": "BREAKING: Supreme Court hearing",
+            "summary": "Latest development",
+            "published_at": (datetime.now(timezone.utc) - timedelta(days=2)).isoformat(),
+        }
+        fresh = {
+            "title": "BREAKING: Supreme Court hearing",
+            "summary": "Latest development",
+            "published_at": (datetime.now(timezone.utc) - timedelta(minutes=20)).isoformat(),
+        }
+        self.assertEqual(scout.score_story(stale)["urgency"], "NORMAL")
+        self.assertEqual(scout.score_story(fresh)["urgency"], "POTENTIAL_BREAKING")
+
+    def test_related_headlines_cluster_across_sources(self):
+        scout = ScoutAgent.__new__(ScoutAgent)
+        stories = [
+            {"title": "Supreme Court suspends new tax measure", "source": "Source A", "impact_score": 20, "image_url": "https://example.com/a.jpg", "link": "https://example.com/a"},
+            {"title": "Supreme Court suspends the new tax measure", "source": "Source B", "impact_score": 18, "image_url": "", "link": "https://example.com/b"},
+        ]
+        clustered = scout.cluster_related(stories)
+        self.assertEqual(len(clustered), 1)
+        self.assertEqual(clustered[0]["source_count"], 2)
+
     def test_routine_press_release_is_penalised(self):
         scout = ScoutAgent.__new__(ScoutAgent)
         story = {
