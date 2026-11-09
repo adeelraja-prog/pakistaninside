@@ -1,38 +1,153 @@
-import feedparser
 import json
 import re
+import time
+import hashlib
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
+from html import unescape
+from urllib.parse import urlparse
+
+import feedparser
+import requests
+
 
 class ScoutAgent:
+    """Collect, normalise, deduplicate and rank public-interest RSS stories."""
+
+    TOPIC_RULES = {
+        "POLITICS": ["pti", "imran khan", " عمران خان", "پی ٹی آئی", "تحریک انصاف", "نواز شریف", "بلاول", "پارلیمان", "پارلیمنٹ", "election", "political", "وزیر اعظم", "وزیراعظم"],
+        "COURT": ["supreme court", "high court", "عدالت", "عدلیہ", "چیف جسٹس", "جج", "سپریم کورٹ", "ہائی کورٹ", "عدالتی", "hearing", "verdict", "bail", "petition"],
+        "PUBLIC_INTEREST": ["بجلی", "گیس", "پٹرول", "پیٹرول", "مہنگائی", "آٹا", "تنخواہ", "پنشن", "تعلیم", "صحت", "water", "load shedding", "inflation", "electricity", "petrol", "prices", "tax"],
+        "ECONOMY": ["معیشت", "معاشی", "اسٹیٹ بینک", "آئی ایم ایف", "imf", "economy", "budget", "rupee", "دہشت گردی", "exports", "trade"],
+        "DEFENSE": ["security", "دہشت گردی", "فوج", "پاک فوج", "دفاع", "افغانستان", "بلوچستان", "خیبر پختونخوا", "terror", "militant", "attack"],
+        "WORLD": ["international", "world", "غزہ", "فلسطین", "اسرائیل", "ایران", "امریکا", "امریکی", "china", "india", "ukraine", "gaza"],
+    }
+    BREAKING_TERMS = ["breaking", "just in", "urgent", "فوری", "بریکنگ", "ہنگامی", "ابھی ابھی"]
+    PRESS_RELEASE_TERMS = ["press release", "پریس ریلیز", "اعلامیہ", "ترجمان کے مطابق", "وزارت نے بتایا", "اجلاس کی صدارت", "وفد سے ملاقات", "وفد نے ملاقات"]
+
     def __init__(self, manifest_path="manifest.json"):
-        with open(manifest_path, "r") as f:
-            self.config = json.load(f)
+        with open(manifest_path, "r", encoding="utf-8") as handle:
+            self.config = json.load(handle)
+        self.session = requests.Session()
+        self.session.headers.update({"User-Agent": "AdeelRajaNewsroom/1.0 (RSS news monitor)"})
+
+    @staticmethod
+    def clean_html(value):
+        value = re.sub(r"<[^>]+>", " ", str(value or ""))
+        return re.sub(r"\s+", " ", unescape(value)).strip()
+
+    @staticmethod
+    def parse_date(entry):
+        for key in ("published", "updated", "created"):
+            raw = entry.get(key)
+            if raw:
+                try:
+                    dt = parsedate_to_datetime(raw)
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=timezone.utc)
+                    return dt.astimezone(timezone.utc).isoformat()
+                except (TypeError, ValueError, OverflowError):
+                    pass
+        for key in ("published_parsed", "updated_parsed"):
+            value = entry.get(key)
+            if value:
+                try:
+                    return datetime.fromtimestamp(time.mktime(value), timezone.utc).isoformat()
+                except (ValueError, OverflowError, OSError):
+                    pass
+        return ""
+
+    @staticmethod
+    def extract_image(entry):
+        for item in entry.get("media_content", []) + entry.get("media_thumbnail", []):
+            url = item.get("url")
+            if url and url.startswith("https://"):
+                return url
+        for item in entry.get("links", []):
+            if item.get("rel") == "enclosure" and item.get("type", "").startswith("image/"):
+                url = item.get("href", "")
+                if url.startswith("https://"):
+                    return url
+        for field in ("summary", "description"):
+            match = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', entry.get(field, ""), re.I)
+            if match and match.group(1).startswith("https://"):
+                return match.group(1)
+        return ""
 
     def fetch_rss_news(self):
         stories = []
-        for url in self.config.get("rss_feeds", []):
+        for feed_url in self.config.get("rss_feeds", []):
             try:
-                feed = feedparser.parse(url)
-                for entry in feed.entries[:5]:
-                    title = entry.get("title", "")
-                    summary = entry.get("summary", title)
+                response = self.session.get(feed_url, timeout=20)
+                response.raise_for_status()
+                feed = feedparser.parse(response.content)
+                source = self.clean_html(feed.feed.get("title") or urlparse(feed_url).netloc)
+                for entry in feed.entries[:30]:
+                    title = self.clean_html(entry.get("title"))
+                    summary = self.clean_html(entry.get("summary") or entry.get("description") or title)
+                    link = entry.get("link", "")
+                    if not title or not link.startswith("http"):
+                        continue
                     stories.append({
                         "title": title,
-                        "summary": re.sub(r"<[^>]+>", "", summary)[:400],
-                        "link": entry.get("link", ""),
-                        "source": feed.feed.get("title", "News"),
+                        "summary": summary[:1400],
+                        "link": link,
+                        "source": source,
+                        "published_at": self.parse_date(entry),
+                        "image_url": self.extract_image(entry),
                     })
-            except Exception as e:
-                print(f"[Scout] Feed error {url}: {e}")
+            except Exception as exc:
+                print(f"[SCOUT] Feed error {feed_url}: {type(exc).__name__}: {exc}")
         return stories
 
+    @staticmethod
+    def story_key(story):
+        text = re.sub(r"[^\w\u0600-\u06FF]+", " ", story["title"].lower())
+        return hashlib.sha1(text.encode("utf-8")).hexdigest()
+
+    def score_story(self, story):
+        text = (story["title"] + " " + story["summary"]).lower()
+        score, topics = 0, []
+        for topic, terms in self.TOPIC_RULES.items():
+            hits = sum(1 for term in terms if term.lower() in text)
+            if hits:
+                topics.append(topic)
+                score += min(hits * 5, 18)
+        if any(term in text for term in self.BREAKING_TERMS):
+            score += 12
+            story["urgency"] = "POTENTIAL_BREAKING"
+        else:
+            story["urgency"] = "NORMAL"
+        if any(term in text for term in self.PRESS_RELEASE_TERMS):
+            score -= 12
+            story["press_release_penalty"] = True
+        else:
+            story["press_release_penalty"] = False
+        # Recency score: date missing is not treated as fresh.
+        if story.get("published_at"):
+            try:
+                published = datetime.fromisoformat(story["published_at"])
+                age_hours = max(0, (datetime.now(timezone.utc) - published).total_seconds() / 3600)
+                score += max(0, 18 - int(age_hours / 2))
+            except ValueError:
+                pass
+        story["topics"] = topics or ["GENERAL"]
+        story["tag"] = next((t for t in ("COURT", "POLITICS", "PUBLIC_INTEREST", "DEFENSE", "ECONOMY", "WORLD") if t in topics), "GENERAL")
+        story["impact_score"] = score
+        return story
+
     def run(self):
-        print("[Scout] Collecting stories...")
-        stories = self.fetch_rss_news()
-        # Simple impact scoring
-        impact_keywords = ["petrol", "electricity", "imf", "court", "scheme", "price", "inflation", "پٹرول", "بجلی"]
-        for s in stories:
-            text = (s["title"] + " " + s["summary"]).lower()
-            s["impact"] = sum(1 for k in impact_keywords if k in text)
-        stories.sort(key=lambda x: x["impact"], reverse=True)
-        print(f"[Scout] Collected {len(stories)} stories")
-        return stories[:20]
+        print("[SCOUT] Collecting up to 30 entries per feed...")
+        collected = self.fetch_rss_news()
+        unique, seen = [], set()
+        for story in collected:
+            key = self.story_key(story)
+            if key in seen:
+                continue
+            seen.add(key)
+            unique.append(self.score_story(story))
+        unique.sort(key=lambda item: (item["impact_score"], bool(item.get("image_url"))), reverse=True)
+        print(f"[SCOUT] Collected {len(collected)}; {len(unique)} unique stories.")
+        for item in unique[:10]:
+            print(f"[SCOUT] score={item['impact_score']} topics={item['topics']} source={item['source']} title={item['title'][:110]}")
+        return unique[:30]
