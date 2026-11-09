@@ -6,6 +6,7 @@ from engine.editor import EditorAgent, GeminiQuotaExceededError
 from engine.designer import DesignerAgent
 from engine.video import VideoAgent
 from engine.strategist import StrategistAgent
+from engine.published_state import PublishedState
 
 
 def main():
@@ -40,6 +41,7 @@ def main():
     designer = DesignerAgent()
     video_agent = VideoAgent()
     strategist = StrategistAgent()
+    published_state = PublishedState()
     publish_facebook = os.getenv("PUBLISH_TO_FACEBOOK", "false").lower() == "true"
     publish_youtube = os.getenv("PUBLISH_TO_YOUTUBE", "false").lower() == "true"
     youtube = None
@@ -69,19 +71,27 @@ def main():
             print(f"[OUTPUT {index}] Reel: {video_path}")
 
             if publish_facebook:
-                result = strategist.publish_to_facebook(poster_path, caption)
-                if not isinstance(result, dict) or result.get("error"):
-                    raise RuntimeError(f"Facebook publishing not confirmed: {result}")
-                print(f"[FACEBOOK {index}] Confirmed receipt: {result}")
+                if published_state.is_published(item["source_url"], "facebook"):
+                    print(f"[FACEBOOK {index}] Duplicate guard: already published; skipping.")
+                else:
+                    result = strategist.publish_to_facebook(poster_path, caption)
+                    if not isinstance(result, dict) or result.get("error"):
+                        raise RuntimeError(f"Facebook publishing not confirmed: {result}")
+                    published_state.mark_published(item["source_url"], "facebook", result.get("id") or result.get("post_id"))
+                    print(f"[FACEBOOK {index}] Confirmed receipt: {result}")
 
             if publish_youtube:
-                result = youtube.upload_short(
-                    video_path,
-                    item["headline"],
-                    caption,
-                    tags=["AdeelRaja", "PakistanNews", "PTI", "Pakistan", "Shorts"],
-                )
-                print(f"[YOUTUBE {index}] Confirmed receipt: {result}")
+                if published_state.is_published(item["source_url"], "youtube"):
+                    print(f"[YOUTUBE {index}] Duplicate guard: already uploaded; skipping.")
+                else:
+                    result = youtube.upload_short(
+                        video_path,
+                        item["headline"],
+                        caption,
+                        tags=["AdeelRaja", "PakistanNews", "PTI", "Pakistan", "Shorts"],
+                    )
+                    published_state.mark_published(item["source_url"], "youtube", result["video_id"])
+                    print(f"[YOUTUBE {index}] Confirmed receipt: {result}")
 
         except Exception as exc:
             failures += 1
