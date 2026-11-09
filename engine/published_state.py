@@ -39,7 +39,11 @@ class PublishedState:
         }
         # Bound the cache file so it cannot grow indefinitely.
         if len(self.data) > 500:
-            self.data = dict(list(self.data.items())[-500:])
+            meta = self.data.get("_meta")
+            story_items = [(key, value) for key, value in self.data.items() if key != "_meta"]
+            self.data = dict(story_items[-499:])
+            if meta is not None:
+                self.data["_meta"] = meta
         self.path.write_text(
             json.dumps(self.data, ensure_ascii=False, indent=2),
             encoding="utf-8",
