@@ -27,7 +27,7 @@ class NewsroomRegressionTests(unittest.TestCase):
             "published_at": (datetime.now(timezone.utc) - timedelta(days=2)).isoformat(),
         }
         fresh = {
-            "title": "BREAKING: Supreme Court hearing",
+            "title": "BREAKING: Supreme Court issues court order on Imran Khan bail",
             "summary": "Latest development",
             "published_at": (datetime.now(timezone.utc) - timedelta(minutes=20)).isoformat(),
         }
