@@ -113,3 +113,21 @@ A separate 9:16 production pipeline:
 - Whether any separate branches/workflows or external video experiments exist outside the inspected default-branch files.
 
 This is a source-code audit of the inspected default-branch files, not a claim that every external integration or historical run has been exhaustively verified.
+
+
+## Additional confirmed findings from GitHub Actions run 41624859464 (2026-11-03)
+
+The workflow and job were marked successful, but the job log shows the newsroom did not successfully publish:
+
+- Scout collected 30 stories.
+- Gemini returned repeated HTTP 503 UNAVAILABLE errors (high demand).
+- The application then used its simple English fallback despite the intended Urdu-first workflow.
+- Facebook Graph API returned HTTP 403 / OAuthException code 200: the permission `publish_actions` is deprecated/unavailable.
+- The Strategist returned error dictionaries, but the old `main.py` only printed those dictionaries and did not fail the job. Therefore GitHub Actions reported success despite Facebook publication failure.
+- The `latest-poster` artifact uploaded successfully, but artifact upload success is not evidence of successful Facebook publishing or editorial quality.
+
+This proves the prior green workflow status was a false positive for end-to-end newsroom success. Phase 1 must treat platform error receipts as job failures and distinguish artifact creation from publishing confirmation.
+
+## Run status interpretation
+
+A green Actions run currently proves only that the Python process exited successfully and the artifact step completed. It does not prove that a Facebook post was created. Production acceptance must check the platform response ID and, where possible, the resulting post URL.
