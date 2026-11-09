@@ -1,6 +1,5 @@
-
 google-genai
 requests
-Pillow
+Pillow>=10.0
 beautifulsoup4
 feedparser
