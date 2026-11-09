@@ -147,7 +147,9 @@ def main():
     failures = 0
     completed = 0
 
-    for index, item in enumerate(processed[:max_posts], start=1):
+    for index, item in enumerate(processed, start=1):
+        if completed >= max_posts:
+            break
         source_url = item.get("source_url", "")
         if item.get("language") != "ur" or not item.get("urdu_text"):
             print(f"[STORY SKIPPED {index}] Urdu-first gate failed.")
