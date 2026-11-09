@@ -62,7 +62,7 @@ def main():
             video_path = video_agent.generate_reel(item)
             caption = (
                 f"{item['headline']}\n\n{item.get('body', '')}"
-                f"\n\nSource: {item.get('source_name', 'News source')}"
+                f"\n\nSources: {', '.join(item.get('corroborating_sources', [item.get('source_name', 'News source')]))}"
                 f"\n{item['source_url']}"
                 "\n\nAdeel Raja\n#AdeelRaja"
             )
