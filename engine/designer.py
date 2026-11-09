@@ -44,8 +44,11 @@ class DesignerAgent:
             "/usr/share/fonts/**/*NastaliqUrdu*Regular*.ttf",
             "/usr/share/fonts/**/*Nastaliq*Regular*.ttf",
             "/usr/share/fonts/**/*Naskh*Regular*.ttf",
+            "/usr/share/fonts/**/*NotoSansArabic*Regular*.ttf",
             "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf",
             "/usr/share/fonts/opentype/noto/NotoNaskhArabic-Regular.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         ])
         self.english_font_path = self._find_font([
             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
@@ -58,7 +61,7 @@ class DesignerAgent:
         if not features.check("raqm"):
             raise RuntimeError("Pillow RAQM is required for correct Urdu shaping.")
         if not self.urdu_font_path:
-            raise RuntimeError("No Urdu-capable Nastaliq/Naskh font found.")
+            raise RuntimeError("No Arabic-script font suitable for Urdu rendering found. Install Noto Arabic or DejaVu fonts.")
 
     @staticmethod
     def _find_font(patterns):
