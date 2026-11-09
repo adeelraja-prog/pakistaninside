@@ -15,9 +15,9 @@ class DailyRequestBudget:
     def __init__(self, path="state/gemini_usage.json", limit=None, now=None):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.limit = int(limit or os.getenv("GEMINI_DAILY_REQUEST_LIMIT", "18"))
-        self.day = (now or datetime.now(ZoneInfo("Asia/Karachi"))).astimezone(
-            ZoneInfo("Asia/Karachi")
+        self.limit = int(limit or os.getenv("GEMINI_DAILY_REQUEST_LIMIT", "16"))
+        self.day = (now or datetime.now(ZoneInfo("America/Los_Angeles"))).astimezone(
+            ZoneInfo("America/Los_Angeles")
         ).date().isoformat()
         try:
             self.data = json.loads(self.path.read_text(encoding="utf-8"))
@@ -30,7 +30,7 @@ class DailyRequestBudget:
         used = int(self.data.get("requests", 0))
         if used >= self.limit:
             raise RequestBudgetExceeded(
-                f"Daily free-tier Gemini request cap reached ({self.limit} requests, Asia/Karachi day)."
+                f"Daily free-tier Gemini request cap reached ({self.limit} requests, America/Los_Angeles day)."
             )
         self.data["requests"] = used + 1
         self.path.write_text(
