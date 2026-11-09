@@ -2,19 +2,29 @@ import json
 import os
 import re
 import time
+
 from google import genai
 from google.genai import types
+
 
 class GeminiQuotaExceededError(Exception):
     pass
 
+
 class GeminiAPIError(Exception):
     pass
+
 
 class GeminiOutputError(Exception):
     pass
 
+
 class EditorAgent:
+    ALLOWED_TAGS = {
+        "POLITICS", "ECONOMY", "COURT", "HEALTH",
+        "TECH", "DEFENSE", "GENERAL", "PUBLIC_INTEREST",
+    }
+
     def __init__(self):
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
@@ -23,10 +33,13 @@ class EditorAgent:
         self.model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 
     def process_stories(self, stories, language="ur"):
+        if language != "ur":
+            raise ValueError("This newsroom pipeline currently requires Urdu-first output")
         if not stories:
             raise ValueError("No stories provided")
 
         prompt = self._build_prompt(stories, language)
+        last_error = None
 
         for attempt in range(5):
             try:
@@ -35,115 +48,94 @@ class EditorAgent:
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
-                        temperature=0.4,
+                        temperature=0.25,
                     ),
                 )
-                text = response.text.strip()
-                if not text:
-                    raise GeminiOutputError("Empty response")
+                raw = (response.text or "").strip()
+                if not raw:
+                    raise GeminiOutputError("Empty model response")
 
-                # Strip fences if present
-                text = re.sub(r"^```json\s*|\s*```$", "", text, flags=re.MULTILINE)
-                data = json.loads(text)
-
+                raw = re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$", "", raw, flags=re.IGNORECASE)
+                data = json.loads(raw)
                 if isinstance(data, dict):
                     data = [data]
-                if not isinstance(data, list):
-                    raise GeminiOutputError("Expected list of stories")
+                if not isinstance(data, list) or not data:
+                    raise GeminiOutputError("Expected a non-empty JSON array")
 
-                results = []
-                for item in data:
-                    results.append(self._validate_item(item, language))
-                return results
+                return [self._validate_item(item, language) for item in data]
 
-            except Exception as e:
-                err = str(e).lower()
-                if "free_tier" in err or "quota" in err or "resource_exhausted" in err:
-                    raise GeminiQuotaExceededError("Quota exhausted")
+            except Exception as exc:
+                message = str(exc).lower()
+                if any(token in message for token in ("free_tier", "quota", "resource_exhausted", "429")):
+                    raise GeminiQuotaExceededError(str(exc)) from exc
+                last_error = exc
+                if isinstance(exc, GeminiOutputError) and attempt >= 2:
+                    raise
                 if attempt == 4:
-                    raise GeminiAPIError(str(e))
-                # Longer backoff for 503 / high demand
-                wait = 30 * (attempt + 1)
-                print(f"[Editor] Temporary error, retrying in {wait}s... ({e})")
+                    break
+                wait = min(10 * (attempt + 1), 40)
+                print(f"[EDITOR] Retry {attempt + 1}/5 in {wait}s: {type(exc).__name__}: {exc}")
                 time.sleep(wait)
 
-        raise GeminiAPIError("Failed after retries")
+        raise GeminiAPIError(str(last_error or "Editor failed after retries")) from last_error
 
     def _build_prompt(self, stories, language):
         stories_json = json.dumps(stories, ensure_ascii=False, indent=2)
+        return f"""You are the senior Urdu-language news editor for Adeel Raja's independent digital newsroom.
 
-        if language == "ur":
-            lang_instruction = """
-Write natural, professional Urdu (Nastaliq style).
-Headline must be catchy, impactful, and tempting (masala) while remaining 100% factual.
-Focus on the most interesting angle: public impact, numbers, court orders, petrol/electricity, schemes, etc.
-Never invent facts, quotes, or sources.
-"""
-        else:
-            lang_instruction = """
-Write clear, professional English.
-Headline must be catchy and factual.
-"""
+EDITORIAL RULES:
+- Write natural, idiomatic Pakistani Urdu in Urdu script, not Hindi and not Roman Urdu.
+- Do not translate mechanically. Use concise, broadcast-quality newsroom Urdu.
+- Prioritise verified public-interest developments: PTI/Imran Khan and opposition, courts and judiciary, constitutional matters, parliament, accountability, cost of living, public services, economy, national security, foreign affairs and major world events.
+- Do not automatically favour government press releases. Routine ceremonial announcements, minor appointments and self-congratulatory press releases are low priority unless they have material public consequences.
+- Do not suppress a story because it criticises or supports a political party. Apply the same evidence and public-interest standards to all sides.
+- Never invent facts, names, quotes, dates, figures, legal outcomes or source attribution.
+- Distinguish allegations, claims, court observations, orders and final judgments.
+- Do not label a story BREAKING unless the supplied evidence supports urgency and recency.
+- If the source material is insufficient, say so in the text or exclude the item.
+- Keep the headline concise, factual and compelling. No clickbait.
+- Every item must include a proper Urdu-script headline and body.
 
-        return f"""You are the Senior Editor of Pakistan Inside.
-Brand: Pakistan Inside with Adeel Raja
-Tagline: THE STORY BEHIND THE STORY
+Return only a JSON array. Each object must contain exactly:
+"tag", "headline", "urdu_text", "body", "source_name", "source_attribution", "language".
+Use language="ur". tag must be one of: {", ".join(sorted(self.ALLOWED_TAGS))}.
 
-Rules (strict):
-- Use ONLY the information provided in the stories.
-- Do not invent facts, names, quotes, or sources.
-- Do not create anti-army content.
-- Prefer high-impact stories (economy, petrol, electricity, court, government schemes, public welfare).
-- Make headlines catchy and discussion-worthy (masala) without exaggeration.
-- {lang_instruction}
-
-Return a JSON array of objects. Each object must have exactly these keys:
-"tag" (category: POLITICS, ECONOMY, COURT, HEALTH, TECH, DEFENSE, GENERAL),
-"headline",
-"urdu_text" (or "english_text" if English mode),
-"body" (short graphic line),
-"source_name",
-"source_attribution" (e.g. "زرائع کے مطابق" or columnist name)
-
-Stories:
+INPUT STORIES:
 {stories_json}
 """
 
-    def fallback_stories(self, stories):
-        """No Gemini. Simple English cards from raw titles."""
-        results = []
-        for s in stories[:3]:
-            title = s.get("title", "News Update")
-            summary = s.get("summary", "")[:180]
-            results.append({
-                "tag": "GENERAL",
-                "headline": title,
-                "urdu_text": "",
-                "english_text": summary,
-                "body": summary,
-                "source_name": s.get("source", "Source"),
-                "source_attribution": "Source News",
-                "language": "en",
-            })
-        return results
+    def _validate_item(self, item, language="ur"):
         if not isinstance(item, dict):
-            raise GeminiOutputError("Invalid item")
+            raise GeminiOutputError("Each story must be a JSON object")
 
-        headline = item.get("headline", "").strip()
-        body = item.get("body", "").strip()
-        text_key = "urdu_text" if language == "ur" else "english_text"
-        main_text = item.get(text_key, item.get("urdu_text", "")).strip()
+        headline = str(item.get("headline") or "").strip()
+        urdu_text = str(item.get("urdu_text") or "").strip()
+        body = str(item.get("body") or "").strip()
+        if not headline or not urdu_text:
+            raise GeminiOutputError("Missing Urdu headline or story text")
 
-        if not headline or not main_text:
-            raise GeminiOutputError("Missing headline or text")
+        # Require meaningful Arabic-script Urdu; English-only fallback is forbidden.
+        arabic_chars = re.findall(r"[\u0600-\u06FF]", headline + " " + urdu_text)
+        if len(arabic_chars) < 8:
+            raise GeminiOutputError("Output does not contain sufficient Urdu-script text")
+
+        tag = str(item.get("tag") or "GENERAL").upper().strip()
+        if tag not in self.ALLOWED_TAGS:
+            tag = "GENERAL"
 
         return {
-            "tag": item.get("tag", "GENERAL").upper(),
+            "tag": tag,
             "headline": headline,
-            "urdu_text": main_text if language == "ur" else "",
-            "english_text": main_text if language == "en" else "",
-            "body": body or main_text[:120],
-            "source_name": item.get("source_name", "Source"),
-            "source_attribution": item.get("source_attribution", "زرائع کے مطابق"),
-            "language": language,
+            "urdu_text": urdu_text,
+            "english_text": "",
+            "body": body or urdu_text[:140],
+            "source_name": str(item.get("source_name") or "Source not specified").strip(),
+            "source_attribution": str(item.get("source_attribution") or "ذرائع کے مطابق").strip(),
+            "language": "ur",
         }
+
+    def fallback_stories(self, stories):
+        # Deliberately disabled: raw English RSS titles must never be published as Urdu cards.
+        raise GeminiOutputError(
+            "English/raw-title fallback is disabled. Urdu editorial generation is mandatory."
+        )
