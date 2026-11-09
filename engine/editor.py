@@ -6,6 +6,8 @@ import time
 from google import genai
 from google.genai import types
 
+from engine.usage_budget import DailyRequestBudget, RequestBudgetExceeded
+
 
 class GeminiQuotaExceededError(Exception):
     pass
@@ -34,6 +36,7 @@ class EditorAgent:
             raise RuntimeError("GEMINI_API_KEY missing")
         self.client = genai.Client(api_key=api_key)
         self.model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+        self.usage_budget = DailyRequestBudget()
 
     def process_stories(self, stories, language="ur"):
         if language != "ur":
@@ -46,6 +49,7 @@ class EditorAgent:
 
         for attempt in range(5):
             try:
+                self.usage_budget.consume()
                 response = self.client.models.generate_content(
                     model=self.model,
                     contents=prompt,
@@ -86,6 +90,8 @@ class EditorAgent:
                     validated.append(clean)
                 return validated
 
+            except RequestBudgetExceeded as exc:
+                raise GeminiQuotaExceededError(str(exc)) from exc
             except Exception as exc:
                 message = str(exc).lower()
                 if any(token in message for token in ("free_tier", "quota", "resource_exhausted", "429")):
