@@ -21,8 +21,11 @@ class GeminiOutputError(Exception):
 
 class EditorAgent:
     ALLOWED_TAGS = {
-        "POLITICS", "ECONOMY", "COURT", "HEALTH",
-        "TECH", "DEFENSE", "GENERAL", "PUBLIC_INTEREST", "WORLD",
+        "POLITICS", "COURT", "PUBLIC_INTEREST", "ECONOMY", "DEFENSE",
+        "WORLD", "HEALTH", "EDUCATION", "TECHNOLOGY", "BUSINESS",
+        "SPORTS", "ENTERTAINMENT", "CRIME", "ENVIRONMENT", "ENERGY",
+        "TRANSPORT", "GOVERNANCE", "ELECTIONS", "DIPLOMACY",
+        "HUMAN_RIGHTS", "CLIMATE", "INVESTIGATION", "LOCAL", "GENERAL",
     }
 
     def __init__(self):
