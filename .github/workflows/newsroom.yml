@@ -76,7 +76,7 @@ jobs:
           X_RSS_FEEDS: ${{ vars.X_RSS_FEEDS || '' }}
           WHATSAPP_CHANNEL_URL: ${{ vars.WHATSAPP_CHANNEL_URL || '' }}
           MAX_POSTS_PER_RUN: '3'
-          GEMINI_DAILY_REQUEST_LIMIT: '18'
+          GEMINI_DAILY_REQUEST_LIMIT: '16'
         run: python main.py
 
       - name: Save publication history
