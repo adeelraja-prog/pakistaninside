@@ -35,7 +35,7 @@ class VideoAgent:
     def build_video_filter(frames):
         """Filter graph for gentle image motion, progress line and animated ticker."""
         ticker = "ADEEL RAJA  |  PAKISTAN NEWS  |  COURTS  |  PUBLIC INTEREST  |  WORLD"
-        escaped_ticker = ticker.replace("'", "\\\\'")
+        escaped_ticker = ticker
         return (
             f"zoompan=z='min(zoom+0.00045,1.07)':d={frames}:s=1080x1920:fps=30,"
             "format=yuv420p,"
@@ -43,7 +43,7 @@ class VideoAgent:
             "drawbox=x=0:y=1850:w=1080:h=70:color=0xCA232F@0.96:t=fill,"
             "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
             f"text='{escaped_ticker}':fontcolor=white:fontsize=25:"
-            "x=w-mod(t*145\\\\,w+tw):y=1870"
+            "x=w-mod(t*145\\,w+tw):y=1870"
         )
 
     @staticmethod
@@ -139,18 +139,7 @@ class VideoAgent:
             duration = self._duration(audio_path)
             frames = int(duration * 30)
 
-            # Zoom movement + animated progress line + continuously scrolling newsroom ticker.
-            ticker = "ADEEL RAJA  |  PAKISTAN NEWS  |  COURTS  |  PUBLIC INTEREST  |  WORLD"
-            escaped_ticker = ticker.replace("'", "\\'")
-            filter_graph = (
-                f"zoompan=z='min(zoom+0.00045,1.07)':d={frames}:s=1080x1920:fps=30,"
-                "format=yuv420p,"
-                "drawbox=x=0:y=0:w='18*t':h=9:color=0xCA232F@0.98:t=fill,"
-                "drawbox=x=0:y=1850:w=1080:h=70:color=0xCA232F@0.96:t=fill,"
-                "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
-                f"text='{escaped_ticker}':fontcolor=white:fontsize=25:"
-                "x=w-mod(t*145\\,w+tw):y=1870"
-            )
+            filter_graph = self.build_video_filter(frames)
 
             command = [
                 "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
