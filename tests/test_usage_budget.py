@@ -13,7 +13,7 @@ class DailyRequestBudgetTests(unittest.TestCase):
             budget = DailyRequestBudget(
                 path=str(Path(directory) / "usage.json"),
                 limit=2,
-                now=datetime(2026, 11, 9, 10, 0, tzinfo=ZoneInfo("Asia/Karachi")),
+                now=datetime(2026, 11, 9, 10, 0, tzinfo=ZoneInfo("America/Los_Angeles")),
             )
             self.assertEqual(budget.consume(), 1)
             self.assertEqual(budget.consume(), 2)
@@ -26,13 +26,13 @@ class DailyRequestBudgetTests(unittest.TestCase):
             first = DailyRequestBudget(
                 path=path,
                 limit=1,
-                now=datetime(2026, 11, 9, 23, 0, tzinfo=ZoneInfo("Asia/Karachi")),
+                now=datetime(2026, 11, 9, 23, 0, tzinfo=ZoneInfo("America/Los_Angeles")),
             )
             first.consume()
             second = DailyRequestBudget(
                 path=path,
                 limit=1,
-                now=datetime(2026, 11, 10, 1, 0, tzinfo=ZoneInfo("Asia/Karachi")),
+                now=datetime(2026, 11, 10, 1, 0, tzinfo=ZoneInfo("America/Los_Angeles")),
             )
             self.assertEqual(second.consume(), 1)
 
