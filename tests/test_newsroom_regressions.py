@@ -22,7 +22,7 @@ class NewsroomRegressionTests(unittest.TestCase):
         scout = ScoutAgent.__new__(ScoutAgent)
         from datetime import datetime, timezone, timedelta
         stale = {
-            "title": "BREAKING: Supreme Court hearing",
+            "title": "BREAKING: Supreme Court issues court order on Imran Khan bail",
             "summary": "Latest development",
             "published_at": (datetime.now(timezone.utc) - timedelta(days=2)).isoformat(),
         }
@@ -55,6 +55,28 @@ class NewsroomRegressionTests(unittest.TestCase):
         self.assertTrue(ranked["press_release_penalty"])
         self.assertLess(ranked["impact_score"], 0)
 
+    def test_low_value_routine_announcement_is_excluded(self):
+        scout = ScoutAgent.__new__(ScoutAgent)
+        story = {
+            "title": "Minister chairs routine delegation meeting",
+            "summary": "Officials reviewed progress and congratulated the team",
+            "published_at": "",
+        }
+        ranked = scout.score_story(story)
+        self.assertFalse(ranked["eligible"])
+        self.assertEqual(ranked["exclude_reason"], "ROUTINE_LOW_PUBLIC_INTEREST")
+
+    def test_candidate_selection_preserves_core_public_interest_lanes(self):
+        scout = ScoutAgent.__new__(ScoutAgent)
+        stories = [
+            {"title": "Politics", "tag": "POLITICS", "topics": ["POLITICS"], "impact_score": 90, "eligible": True},
+            {"title": "Courts", "tag": "COURT", "topics": ["COURT"], "impact_score": 70, "eligible": True},
+            {"title": "Bills", "tag": "PUBLIC_INTEREST", "topics": ["PUBLIC_INTEREST"], "impact_score": 60, "eligible": True},
+            {"title": "General", "tag": "GENERAL", "topics": ["GENERAL"], "impact_score": 95, "eligible": True},
+        ]
+        selected = scout.select_editorial_candidates(stories, limit=3)
+        self.assertEqual({item["tag"] for item in selected}, {"POLITICS", "COURT", "PUBLIC_INTEREST"})
+
     def test_poster_refuses_missing_image(self):
         designer = DesignerAgent.__new__(DesignerAgent)
         with self.assertRaises(ValueError):
@@ -66,6 +88,8 @@ class NewsroomRegressionTests(unittest.TestCase):
             "tag": "COURT",
             "headline": "عدالت میں اہم پیش رفت سامنے آ گئی",
             "urdu_text": "عدالت نے مقدمے کی سماعت کے دوران اہم حکم جاری کیا ہے۔",
+            "english_headline": "Court issues important order",
+            "english_text": "The court issued an important order.",
             "source_url": "https://example.com/story",
         }
         result = editor._validate_item(item)
@@ -77,6 +101,8 @@ class NewsroomRegressionTests(unittest.TestCase):
             editor._validate_item({
                 "headline": "English headline",
                 "urdu_text": "English-only body",
+                "english_headline": "English headline",
+                "english_text": "English-only body",
             })
 
 
