@@ -223,3 +223,8 @@ The user clarified that “three premium designs” means **three distinct poste
 3. **White + Red** — clean white page, framed photograph and strong red editorial accent.
 
 The renderer now rotates one style per story and persists the rotation counter between GitHub Actions runs. It supports 23 editorial categories with restrained category accents; the red breaking badge is reserved for stories marked potential-breaking. Posters remain uncluttered, image-led, readable at a distance and suitable for conversion to 9:16 reels.
+
+
+### Free-tier request protection
+
+A persisted daily Gemini API request budget now caps all actual model calls (including retries) at 18 per Pakistan-local calendar day. This leaves headroom below the earlier 20/day quota concern, resets at midnight Asia/Karachi, and is saved/restored with the GitHub Actions state cache. Hourly RSS collection continues, but after the cap the editor safely stops for the rest of that local day instead of switching to raw RSS or English fallback.
