@@ -76,12 +76,12 @@ class ScoutAgent:
         "وزارت نے بتایا", "اجلاس کی صدارت", "وفد سے ملاقات",
         "وفد نے ملاقات", "congratulates", "inaugurated",
         "chairing a meeting", "presided over a meeting",
-        "reviewed progress", "directed officials",
+        "reviewed progress", "directed officials", "congratulated", "delegation meeting",
     ]
 
     ROUTINE_TITLE_TERMS = [
         "chairing meeting", "chairs meeting", "presides over",
-        "delegation calls on", "meets delegation", "inaugurates",
+        "delegation calls on", "meets delegation", "delegation meeting", "chairs routine", "inaugurates",
         "inauguration ceremony", "congratulates", "pays tribute",
         "اجلاس کی صدارت", "وفد کی ملاقات", "ملاقات کی",
         "افتتاحی تقریب", "مبارکباد", "تعزیتی پیغام",
