@@ -292,7 +292,7 @@ class ScoutAgent:
         story["impact_score"] = score
         story["age_hours"] = age_hours
         story["major_event"] = has_major_event
-        story["eligible"] = score >= int(self.config.get("minimum_story_score", 8)) and not story.get("future_dated")
+        story["eligible"] = score >= int(getattr(self, "config", {}).get("minimum_story_score", 8)) and not story.get("future_dated")
         if routine_title and not has_major_event and score < 12:
             story["eligible"] = False
             story["exclude_reason"] = "ROUTINE_LOW_PUBLIC_INTEREST"
