@@ -160,3 +160,14 @@ Implemented on `recovery/international-newsroom` (not merged to production):
 ## Acceptance status
 
 Code-level regression checks have passed on intermediate recovery commits. Final acceptance remains pending: latest-commit CI, live dry-run poster/reel artifacts, image rights review, sample Urdu editorial review, and platform-authorisation checks.
+
+
+## Final verification update
+
+- The latest full regression run before the Gemini model default adjustment completed successfully: **16 unit tests passed**.
+- Model default is set to `gemini-3.8-flash`, not legacy `gemini-2.5-flash`. Google AI Developers Forum guidance in November 2026 recommends Gemini 3.5 Flash-Lite or 3.8 Flash for new projects; 2.5 access is restricted to projects with prior usage.
+- Persistent per-platform publication receipts were added and are saved/restored through GitHub Actions cache as a best-effort duplicate guard.
+- A daily Urdu poll library (30 prompts across politics, courts, public interest, world affairs and entertainment) and a gated daily workflow were added.
+- A user activation checklist is available at `docs/ACTIVATION-CHECKLIST.md`.
+
+The recovery branch is still intentionally separate from `main`. Do not call the newsroom production-ready until a live dry-run has produced inspectable poster and video artifacts and platform permissions have been confirmed.
