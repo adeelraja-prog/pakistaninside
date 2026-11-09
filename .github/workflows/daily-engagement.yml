@@ -37,6 +37,8 @@ jobs:
         if: always()
         with:
           name: adeel-raja-daily-poll
-          path: assets/output/daily_poll.json
+          path: |
+            assets/output/daily_poll.json
+            assets/output/drafts/*
           if-no-files-found: ignore
           retention-days: 7
