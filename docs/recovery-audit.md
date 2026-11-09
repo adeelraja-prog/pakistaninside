@@ -212,3 +212,14 @@ The earlier reliability branch / PR #1 was inspected. Its Urdu validator, font f
 8. Only then approve the recovery PR and merge it to `main`.
 
 Do not describe the project as fully live until these runtime and account-authorisation gates pass.
+
+
+### Poster design requirements recovered from 6 November discussion
+
+The user clarified that “three premium designs” means **three distinct poster directions**, not three posters for each story. The three approved directions are:
+
+1. **Light Editorial** — warm, bright editorial page with a dominant photograph and oversized Urdu headline.
+2. **Dark Editorial** — midnight newsroom treatment with a dominant photograph and high-contrast Urdu headline.
+3. **White + Red** — clean white page, framed photograph and strong red editorial accent.
+
+The renderer now rotates one style per story and persists the rotation counter between GitHub Actions runs. It supports 23 editorial categories with restrained category accents; the red breaking badge is reserved for stories marked potential-breaking. Posters remain uncluttered, image-led, readable at a distance and suitable for conversion to 9:16 reels.
