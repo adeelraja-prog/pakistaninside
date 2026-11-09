@@ -60,6 +60,7 @@ def _write_platform_drafts(item, poster_path, video_path, caption, links):
     whatsapp = {
         "platform": "WhatsApp Channel",
         "status": "READY_FOR_MANUAL_POST",
+        "poster_style": item.get("poster_style", "light_editorial"),
         "headline_urdu": item["headline"],
         "body_urdu": item.get("body") or item.get("urdu_text", ""),
         "headline_english": item.get("english_headline", ""),
@@ -89,6 +90,7 @@ def _write_platform_drafts(item, poster_path, video_path, caption, links):
         "youtube_title": (item.get("english_headline") or item["headline"])[:90] + " #Shorts",
         "youtube_description": caption,
         "youtube_privacy_default": "private",
+        "poster_style": item.get("poster_style", "light_editorial"),
         "poster_file": poster_path,
         "reel_file": video_path or "",
         "whatsapp_draft": str(draft_dir / f"whatsapp_{slug}.json"),
@@ -165,6 +167,7 @@ def main():
             continue
 
         try:
+            item["poster_style"] = published_state.next_poster_style()
             poster_path = designer.generate_card(item)
         except Exception as exc:
             failures += 1
