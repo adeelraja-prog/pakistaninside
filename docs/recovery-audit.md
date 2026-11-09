@@ -131,3 +131,32 @@ This proves the prior green workflow status was a false positive for end-to-end 
 ## Run status interpretation
 
 A green Actions run currently proves only that the Python process exited successfully and the artifact step completed. It does not prove that a Facebook post was created. Production acceptance must check the platform response ID and, where possible, the resulting post URL.
+
+
+## Recovery implementation update (9 November 2026)
+
+Implemented on `recovery/international-newsroom` (not merged to production):
+
+- Replaced the first-five RSS collector with up to 30 entries per feed, date parsing, basic topic lanes, duplicate-title suppression, and recency/topic/press-release heuristics.
+- Repaired the Urdu editor validation path and disabled English/raw-RSS fallback publishing. The editor now must return an exact source URL so image and source metadata can be safely mapped back to the original feed item.
+- Rebuilt poster rendering around a large editorial image, restrained international-newsroom hierarchy, Adeel Raja branding, Urdu Naskh font discovery, RAQM shaping, and unique output filenames. Missing or invalid images now block poster creation.
+- Added vertical 9:16 reel rendering with Urdu TTS via Edge TTS and ffmpeg motion treatment.
+- Added an optional YouTube Shorts uploader, gated behind explicit workflow input and OAuth secrets. Default privacy is private.
+- Added a rotating daily Urdu audience-poll library and a scheduled dry-run workflow. Publishing remains gated behind the repository variable `ENABLE_DAILY_POLL` or a manual approval input.
+- Added a four-hour scheduled newsroom dry-run. Facebook and YouTube publishing remain disabled by default.
+- Added deterministic regression tests for editorial scoring, press-release penalties, Urdu fallback rejection, missing-image blocking, and poll rotation.
+
+## Known limitations / user-side prerequisites
+
+- RSS keyword/topic scoring is a transparent heuristic, not a fully trained editorial judgement system. It does not yet provide robust cross-source corroboration or semantic clustering; editorial sampling is required before production use.
+- RSS image presence does not itself prove reuse rights. Confirm publisher image permissions or replace the image source with appropriately licensed assets before broad automated distribution.
+- Facebook publishing requires a current Page access token and the correct Page permissions (not the deprecated `publish_actions` permission). A successful code check cannot grant these permissions.
+- YouTube uploads require the user to create/authorise an OAuth client, enable YouTube Data API v3, and add `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, and `YOUTUBE_REFRESH_TOKEN` as GitHub secrets. Uploads default to private.
+- WhatsApp Channel publishing is not implemented in this recovery branch. A valid official channel-publishing integration and credentials must be confirmed; do not substitute a WhatsApp Business messaging endpoint and claim it publishes to a Channel.
+- A daily poll workflow and library exist, but automatic live posting remains off until Page permissions are verified and the repository variable is deliberately enabled.
+- The new poster and video pipelines still require a real end-to-end run with live RSS images and the configured TTS service. CI compilation/unit tests alone do not prove visual quality or successful media generation.
+- GitHub Actions schedule timing is best-effort and may be delayed by GitHub. The four-hour workflow is intentionally dry-run by default.
+
+## Acceptance status
+
+Code-level regression checks have passed on intermediate recovery commits. Final acceptance remains pending: latest-commit CI, live dry-run poster/reel artifacts, image rights review, sample Urdu editorial review, and platform-authorisation checks.
