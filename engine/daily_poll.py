@@ -71,7 +71,7 @@ def build_daily_poll(now=None):
         "category": category,
         "question": question,
         "options": options,
-        "message": "\\n".join(lines),
+        "message": "\n".join(lines),
     }
 
 
@@ -93,9 +93,9 @@ def main():
         encoding="utf-8",
     )
     x_draft = (
-        f"{poll['question']}\\n"
+        f"{poll['question']}\n"
         + " | ".join(poll["options"])
-        + "\\n#AdeelRaja"
+        + "\n#AdeelRaja"
     )
     (draft_dir / "daily_poll_x.txt").write_text(x_draft, encoding="utf-8")
 
