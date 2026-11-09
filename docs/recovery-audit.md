@@ -227,4 +227,7 @@ The renderer now rotates one style per story and persists the rotation counter b
 
 ### Free-tier request protection
 
-A persisted daily Gemini API request budget now caps all actual model calls (including retries) at 18 per Pakistan-local calendar day. This leaves headroom below the earlier 20/day quota concern, resets at midnight Asia/Karachi, and is saved/restored with the GitHub Actions state cache. Hourly RSS collection continues, but after the cap the editor safely stops for the rest of that local day instead of switching to raw RSS or English fallback.
+A persisted daily Gemini API request budget now caps all actual model calls (including retries) at 16 per Pacific Time calendar day. This leaves headroom below the earlier 20/day quota concern, resets at midnight Pacific Time, and is saved/restored with the GitHub Actions state cache. Hourly RSS collection continues, but after the cap the editor safely stops for the rest of that local day instead of switching to raw RSS or English fallback.
+
+
+Google AI Studio's published rate-limit guidance says request-per-day quotas reset at midnight Pacific Time and vary by model/project. The local cap therefore follows Pacific Time, not Pakistan time, and is set to 16 requests/day as a conservative ceiling; it is not a claim that every Gemini model has the same 20-request quota. Free-tier requests may be used by Google to improve its products, so send only public news material, not confidential sources or unpublished sensitive notes.
