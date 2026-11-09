@@ -14,6 +14,8 @@ class EditorValidationTests(unittest.TestCase):
             "headline": "عمران خان سے ملاقات کے معاملے پر نئی پیش رفت",
             "urdu_text": "عدالت میں اس معاملے پر اہم سماعت ہوئی اور فریقین نے اپنے دلائل پیش کیے۔",
             "body": "عدالت میں اہم پیش رفت",
+            "english_headline": "New development in Imran Khan meeting case",
+            "english_text": "A court hearing took place and both sides presented arguments.",
             "source_name": "Test source",
         }
         result = self.editor._validate_item(item)
@@ -41,6 +43,8 @@ class EditorValidationTests(unittest.TestCase):
             "tag": "UNKNOWN",
             "headline": "عدالت کا اہم فیصلہ سامنے آ گیا",
             "urdu_text": "عدالت نے مقدمے کی سماعت کے دوران اہم حکم جاری کیا ہے۔",
+            "english_headline": "Court issues an important order",
+            "english_text": "The court issued an order during the hearing.",
         }
         result = self.editor._validate_item(item)
         self.assertEqual(result["tag"], "GENERAL")
