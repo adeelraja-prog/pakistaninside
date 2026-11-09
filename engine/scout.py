@@ -2,6 +2,7 @@ import json
 import re
 import time
 import hashlib
+from difflib import SequenceMatcher
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from html import unescape
@@ -108,33 +109,64 @@ class ScoutAgent:
     def score_story(self, story):
         text = (story["title"] + " " + story["summary"]).lower()
         score, topics = 0, []
+        age_hours = None
         for topic, terms in self.TOPIC_RULES.items():
             hits = sum(1 for term in terms if term.lower() in text)
             if hits:
                 topics.append(topic)
                 score += min(hits * 5, 18)
-        if any(term in text for term in self.BREAKING_TERMS):
-            score += 12
-            story["urgency"] = "POTENTIAL_BREAKING"
-        else:
-            story["urgency"] = "NORMAL"
-        if any(term in text for term in self.PRESS_RELEASE_TERMS):
-            score -= 12
-            story["press_release_penalty"] = True
-        else:
-            story["press_release_penalty"] = False
-        # Recency score: date missing is not treated as fresh.
+
+        # Recency is explicit: missing timestamps never qualify as breaking.
         if story.get("published_at"):
             try:
                 published = datetime.fromisoformat(story["published_at"])
                 age_hours = max(0, (datetime.now(timezone.utc) - published).total_seconds() / 3600)
                 score += max(0, 18 - int(age_hours / 2))
             except ValueError:
-                pass
+                age_hours = None
+
+        has_breaking_language = any(term in text for term in self.BREAKING_TERMS)
+        if has_breaking_language and age_hours is not None and age_hours <= 3:
+            score += 12
+            story["urgency"] = "POTENTIAL_BREAKING"
+        else:
+            story["urgency"] = "NORMAL"
+
+        if any(term in text for term in self.PRESS_RELEASE_TERMS):
+            score -= 12
+            story["press_release_penalty"] = True
+        else:
+            story["press_release_penalty"] = False
+
         story["topics"] = topics or ["GENERAL"]
         story["tag"] = next((t for t in ("COURT", "POLITICS", "PUBLIC_INTEREST", "DEFENSE", "ECONOMY", "WORLD") if t in topics), "GENERAL")
         story["impact_score"] = score
         return story
+
+    @staticmethod
+    def _similar_title(left, right):
+        normalise = lambda value: re.sub(r"[^\\w\\u0600-\\u06FF]+", " ", value.lower()).strip()
+        return SequenceMatcher(None, normalise(left), normalise(right)).ratio()
+
+    def cluster_related(self, stories):
+        clusters = []
+        for story in stories:
+            match = next((group for group in clusters if self._similar_title(story["title"], group[0]["title"]) >= 0.76), None)
+            if match is None:
+                clusters.append([story])
+            else:
+                match.append(story)
+
+        merged = []
+        for group in clusters:
+            lead = max(group, key=lambda item: (item["impact_score"], bool(item.get("image_url"))))
+            sources = sorted({item["source"] for item in group if item.get("source")})
+            lead["source_count"] = len(sources)
+            lead["corroborating_sources"] = sources
+            lead["source_urls"] = [item["link"] for item in group if item.get("link")]
+            lead["impact_score"] += min(max(0, len(sources) - 1) * 6, 12)
+            merged.append(lead)
+        return merged
 
     def run(self):
         print("[SCOUT] Collecting up to 30 entries per feed...")
@@ -146,6 +178,7 @@ class ScoutAgent:
                 continue
             seen.add(key)
             unique.append(self.score_story(story))
+        unique = self.cluster_related(unique)
         unique.sort(key=lambda item: (item["impact_score"], bool(item.get("image_url"))), reverse=True)
         print(f"[SCOUT] Collected {len(collected)}; {len(unique)} unique stories.")
         for item in unique[:10]:
