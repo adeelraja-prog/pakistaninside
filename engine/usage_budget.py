@@ -10,7 +10,7 @@ class RequestBudgetExceeded(RuntimeError):
 
 
 class DailyRequestBudget:
-    """Persist a hard cap on Gemini API calls in Pakistan local time."""
+    """Persist a hard cap aligned to Google AI Studio's Pacific Time quota reset."""
 
     def __init__(self, path="state/gemini_usage.json", limit=None, now=None):
         self.path = Path(path)
@@ -30,7 +30,7 @@ class DailyRequestBudget:
         used = int(self.data.get("requests", 0))
         if used >= self.limit:
             raise RequestBudgetExceeded(
-                f"Daily free-tier Gemini request cap reached ({self.limit} requests, America/Los_Angeles day)."
+                f"Daily free-tier Gemini request cap reached ({self.limit} requests, Pacific Time day)."
             )
         self.data["requests"] = used + 1
         self.path.write_text(
