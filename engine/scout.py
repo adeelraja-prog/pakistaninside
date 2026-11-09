@@ -145,7 +145,7 @@ class ScoutAgent:
 
     @staticmethod
     def _similar_title(left, right):
-        normalise = lambda value: re.sub(r"[^\\w\\u0600-\\u06FF]+", " ", value.lower()).strip()
+        normalise = lambda value: re.sub(r"[^\w\u0600-\u06FF]+", " ", value.lower()).strip()
         return SequenceMatcher(None, normalise(left), normalise(right)).ratio()
 
     def cluster_related(self, stories):
