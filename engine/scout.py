@@ -182,11 +182,17 @@ class ScoutAgent:
                     link = entry.get("link", "")
                     if not title or not link.startswith("https://"):
                         continue
+                    entry_source = entry.get("source") or {}
+                    publisher = (
+                        self.clean_html(entry_source.get("title"))
+                        if isinstance(entry_source, dict) and entry_source.get("title")
+                        else source
+                    )
                     stories.append({
                         "title": title,
                         "summary": summary[:1800],
                         "link": link,
-                        "source": source,
+                        "source": publisher,
                         "published_at": self.parse_date(entry),
                         "image_url": self.extract_image(entry),
                     })
