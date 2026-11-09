@@ -171,3 +171,44 @@ Code-level regression checks have passed on intermediate recovery commits. Final
 - A user activation checklist is available at `docs/ACTIVATION-CHECKLIST.md`.
 
 The recovery branch is still intentionally separate from `main`. Do not call the newsroom production-ready until a live dry-run has produced inspectable poster and video artifacts and platform permissions have been confirmed.
+
+
+## Consolidated older-thread requirements and implementation (9 November 2026)
+
+The earlier reliability branch / PR #1 was inspected. Its Urdu validator, font fallback and preview workflow changes are superseded by the recovery branch implementation; production `main` remains unchanged. Do not merge the old PR independently.
+
+### Recovered requirements now represented in code
+
+- Brand the newsroom outputs as **Adeel Raja**. Keep the Adeel Raja Views main channel and Adeel Raja Shorts separate; promote Facebook, X and TikTok links. Telegram is not part of this distribution plan.
+- Collect from Geo, ARY, Dawn, Express, The News, Tribune, ProPakistani and BBC Urdu, plus focused Google News RSS searches for PTI/Imran Khan, courts/judiciary, breaking developments, cost of living and security.
+- Add a configurable `X_RSS_FEEDS` bridge for public X-to-RSS feeds. This deliberately does not scrape X or depend on a paid X API.
+- Rank for public impact, freshness and major developments; reserve candidate slots for politics/PTI, courts/judiciary and public-interest news; penalise or exclude routine ceremonial press releases; cluster similar headlines across sources.
+- Recover missing article images from safe public HTTPS Open Graph/Twitter metadata. Refuse unsafe redirects, invalid images and broken image-less posters.
+- Generate Urdu-first and English companion copy in the same editorial pass. Urdu is required and remains the primary poster/reel language; English companion text is required for bilingual captions and distribution drafts.
+- Rebuild the 4:5 poster as a clean international image-first layout with a readable masthead, large Urdu headline, restrained red accent, date/source footer and Adeel Raja branding.
+- Produce 9:16 Urdu-narrated video with zoom movement, animated progress line and moving newsroom ticker. This is motion-graphics animation over editorial still imagery, not AI-generated cinematic footage.
+- Prepare WhatsApp Channel and X post drafts alongside Facebook/YouTube copy. Facebook can publish via Page API; YouTube Shorts upload remains optional, OAuth-gated and private by default.
+- Prepare a rotating daily Urdu question/opinion prompt covering politics, courts, public issues, world affairs and entertainment. Daily workflow prepares WhatsApp/X drafts; Facebook text publishing remains gated.
+- Run the newsroom hourly (minute 17) with publishing off by default; daily engagement draft runs at 18:00 Pakistan time.
+
+### Platform and free-tier constraints
+
+- Gemini API has a documented free tier, but its quotas vary by model/project and may be exhausted. The newsroom uses one bounded bilingual editorial request per run and stops safely when the quota is exhausted. No paid billing is required by this code; keep the Google project on its free tier and do not enable paid billing.
+- X ingestion requires a user-supplied working public RSS bridge in repository variable `X_RSS_FEEDS`; direct X API reading/publishing is not included because it is not a dependable free integration.
+- Meta's official WhatsApp Business Cloud API documentation does not expose a WhatsApp Channel publishing endpoint. The system therefore prepares ready-to-post Channel drafts and assets for manual posting; it does not use unofficial WhatsApp Web automation.
+- The WhatsApp Channel invitation URL can be set as repository variable `WHATSAPP_CHANNEL_URL`; until supplied, no link is invented.
+- YouTube Shorts upload requires OAuth secrets and a manually authorised channel. No upload occurs unless the manual workflow input enables it.
+- Publisher RSS/OG images may be copyrighted. Confirm rights or configure licensed image sources before automated public distribution.
+
+### Current acceptance gates
+
+1. Latest commit must pass Recovery Quality Checks (compile + deterministic tests).
+2. Run the hourly newsroom workflow manually with both publish flags false.
+3. Inspect JPG posters, MP4 reels, bilingual captions, WhatsApp JSON drafts and X text drafts.
+4. Review Urdu quality, image relevance/rights and actual video motion/voice.
+5. Confirm Facebook Page permissions and complete a controlled test post.
+6. Configure YouTube OAuth and test a private Short.
+7. Supply a verified X RSS bridge and WhatsApp invite URL if those features are to be connected.
+8. Only then approve the recovery PR and merge it to `main`.
+
+Do not describe the project as fully live until these runtime and account-authorisation gates pass.
