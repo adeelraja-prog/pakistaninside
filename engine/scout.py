@@ -100,7 +100,7 @@ class ScoutAgent:
     @staticmethod
     def clean_html(value):
         value = re.sub(r"<[^>]+>", " ", str(value or ""))
-        return re.sub(r"\\s+", " ", unescape(value)).strip()
+        return re.sub(r"\s+", " ", unescape(value)).strip()
 
     @staticmethod
     def parse_date(entry):
@@ -159,7 +159,7 @@ class ScoutAgent:
             value = entry.get(field, "")
             if isinstance(value, list):
                 value = " ".join(str(x.get("value", "")) for x in value if isinstance(x, dict))
-            match = re.search(r'<img[^>]+src=["\\']([^"\\']+)["\\']', str(value), re.I)
+            match = re.search(r"<img[^>]+src=[\"']([^\"']+)[\"']", str(value), re.I)
             if match and match.group(1).startswith("https://"):
                 return match.group(1)
         return ""
@@ -224,7 +224,7 @@ class ScoutAgent:
 
     @staticmethod
     def story_key(story):
-        text = re.sub(r"[^\\w\\u0600-\\u06FF]+", " ", story["title"].lower())
+        text = re.sub(r"[^\w\u0600-\u06FF]+", " ", story["title"].lower())
         return hashlib.sha1(text.encode("utf-8")).hexdigest()
 
     def score_story(self, story):
@@ -297,7 +297,7 @@ class ScoutAgent:
 
     @staticmethod
     def _similar_title(left, right):
-        normalise = lambda value: re.sub(r"[^\\w\\u0600-\\u06FF]+", " ", value.lower()).strip()
+        normalise = lambda value: re.sub(r"[^\w\u0600-\u06FF]+", " ", value.lower()).strip()
         return SequenceMatcher(None, normalise(left), normalise(right)).ratio()
 
     def cluster_related(self, stories):
