@@ -47,6 +47,19 @@ jobs:
       - name: Compile Python files
         run: python -m compileall -q .
 
+      - name: Restore publication history
+        uses: actions/cache/restore@v4
+        with:
+          path: state/published.json
+          key: adeel-published-state-${{ github.run_id }}
+          restore-keys: |
+            adeel-published-state-
+
+      - name: Initialise publication history
+        run: |
+          mkdir -p state
+          test -f state/published.json || echo '{}' > state/published.json
+
       - name: Run newsroom
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -61,6 +74,13 @@ jobs:
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
           URDU_TTS_VOICE: ur-PK-UzmaNeural
         run: python main.py
+
+      - name: Save publication history
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state/published.json
+          key: adeel-published-state-${{ github.run_id }}
 
       - name: Upload newsroom outputs
         uses: actions/upload-artifact@v4
