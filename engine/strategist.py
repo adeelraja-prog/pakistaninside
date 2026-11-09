@@ -1,4 +1,5 @@
 
+import mimetypes
 import os
 import requests
 
@@ -63,7 +64,7 @@ class StrategistAgent:
                     "source": (
                         os.path.basename(image_path),
                         image_file,
-                        "image/png"
+                        mimetypes.guess_type(image_path)[0] or "image/jpeg"
                     )
                 }
 
