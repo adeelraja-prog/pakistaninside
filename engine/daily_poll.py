@@ -1,4 +1,5 @@
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -69,6 +70,21 @@ def main():
     Path("assets/output").mkdir(parents=True, exist_ok=True)
     Path("assets/output/daily_poll.json").write_text(
         json.dumps(poll, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    draft_dir = Path("assets/output/drafts")
+    draft_dir.mkdir(parents=True, exist_ok=True)
+    (draft_dir / "daily_poll_whatsapp.json").write_text(
+        json.dumps({
+            "platform": "WhatsApp Channel",
+            "status": "READY_FOR_MANUAL_POST",
+            "message": poll["message"],
+            "channel_invite_url": os.getenv("WHATSAPP_CHANNEL_URL", ""),
+        }, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    (draft_dir / "daily_poll_x.txt").write_text(
+        f"{poll['question']}\\n" + " | ".join(POLLS[(datetime.now(timezone.utc).timetuple().tm_yday - 1) % len(POLLS)][2]) + "\\n#AdeelRaja",
+        encoding="utf-8",
     )
     print(f"[POLL] Prepared category={poll['category']} question={poll['question']}")
     if __name__ == "__main__" and __import__("os").getenv("PUBLISH_DAILY_POLL", "false").lower() == "true":
