@@ -42,6 +42,14 @@ def build_daily_poll(now=None):
     now = now or datetime.now(timezone.utc)
     day = now.timetuple().tm_yday
     category, question, options = POLLS[(day - 1) % len(POLLS)]
+    links = {
+        "YouTube": "https://www.youtube.com/@adeelrajaviews",
+        "Shorts": "https://www.youtube.com/@adeelrajashorts",
+        "Facebook": "https://www.facebook.com/adeelrajaviews",
+        "X": "https://x.com/adeelraja",
+        "TikTok": "https://www.tiktok.com/@adeelrajaviews",
+        "WhatsApp Channel": os.getenv("WHATSAPP_CHANNEL_URL", ""),
+    }
     lines = [
         f"آج کا سوال | {category}",
         "",
@@ -56,13 +64,15 @@ def build_daily_poll(now=None):
         "Adeel Raja",
         "#AdeelRaja #Pakistan",
         "",
-        "Follow:",
-        "YouTube: https://www.youtube.com/@adeelrajaviews",
-        "Shorts: https://www.youtube.com/@adeelrajashorts",
-        "Facebook: https://www.facebook.com/adeelrajaviews",
-        "X: https://x.com/adeelraja",
+        "Follow Adeel Raja:",
     ])
-    return {"category": category, "question": question, "message": "\n".join(lines)}
+    lines.extend(f"{label}: {url}" for label, url in links.items() if url)
+    return {
+        "category": category,
+        "question": question,
+        "options": options,
+        "message": "\\n".join(lines),
+    }
 
 
 def main():
@@ -82,16 +92,19 @@ def main():
         }, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    (draft_dir / "daily_poll_x.txt").write_text(
-        f"{poll['question']}\\n" + " | ".join(POLLS[(datetime.now(timezone.utc).timetuple().tm_yday - 1) % len(POLLS)][2]) + "\\n#AdeelRaja",
-        encoding="utf-8",
+    x_draft = (
+        f"{poll['question']}\\n"
+        + " | ".join(poll["options"])
+        + "\\n#AdeelRaja"
     )
+    (draft_dir / "daily_poll_x.txt").write_text(x_draft, encoding="utf-8")
+
     print(f"[POLL] Prepared category={poll['category']} question={poll['question']}")
-    if __name__ == "__main__" and __import__("os").getenv("PUBLISH_DAILY_POLL", "false").lower() == "true":
+    if os.getenv("PUBLISH_DAILY_POLL", "false").lower() == "true":
         from engine.strategist import StrategistAgent
         result = StrategistAgent().publish_text_post(poll["message"])
         if result.get("error") or not result.get("id"):
-            raise RuntimeError(f"Daily poll publishing was not confirmed: {result}")
+            raise RuntimeError(f"Facebook post was not confirmed: {result}")
         print(f"[POLL] Facebook post confirmed: {result}")
     else:
         print("[POLL] Dry-run only. Set PUBLISH_DAILY_POLL=true after verifying Page permissions.")
