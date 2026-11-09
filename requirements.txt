@@ -1,6 +1,8 @@
-
 google-genai
+google-api-python-client
+google-auth
 requests
-Pillow
+Pillow>=10.0
 beautifulsoup4
 feedparser
+edge-tts

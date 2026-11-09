@@ -1,0 +1,233 @@
+# Pakistan Inside — Recovery Audit & Roadmap
+
+Date: 2026-11-09
+Target branch: recovery/international-newsroom
+Production branch: main (unchanged)
+Brand direction: Adeel Raja
+Visual direction: International premium newsroom
+Operating constraint: free-first; no paid API dependency introduced by this recovery plan.
+
+## Confirmed findings from inspected source
+
+1. `engine/scout.py` reads only the first five entries from each RSS feed, uses a small fixed keyword list, ranks by keyword count, and returns at most 20 stories. This is not editorial importance ranking, does not establish recency or corroboration, and can miss significant stories lower in feeds.
+2. `engine/editor.py` fallback returns English-only cards with blank Urdu. In the inspected `main.py`, quota and general editor errors explicitly publish this fallback. This violates Urdu-first output requirements.
+3. `engine/editor.py` contains validation code after the unconditional return in `fallback_stories`; that code is unreachable. The intended item validation method is therefore not defined in the inspected class.
+4. `engine/designer.py` creates a flat colour background. No image retrieval/download path is present. It uses single-line draw calls without robust Urdu wrapping, text-fit, or clipping checks. It only discovers fonts by matching a filename keyword and falls back to Pillow's default font.
+5. `main.py` uses one fixed output path for every story. Multiple cards in one run overwrite the same file, so the uploaded artifact may contain only the last card.
+6. `.github/workflows/newsroom.yml` contains only manual `workflow_dispatch`; no `schedule` trigger is configured in that workflow.
+7. Inspected execution path only publishes to Facebook. No YouTube Shorts rendering/upload or WhatsApp publishing path is present in the inspected files.
+8. Facebook publishing code checks for a returned photo/post ID, but actual publication success rates require Actions run logs and Page-side verification.
+
+## Recovery rules
+
+- Never publish English fallback when Urdu is required. On editor/model failure, fail closed and record a clear error.
+- Never publish a poster without a valid, relevant image unless an explicitly labelled illustrative graphic is intentionally approved for that story.
+- Never call a story "breaking" solely because it is new. Require credible sourcing and editorial urgency.
+- Deduplicate syndicated stories before ranking and retain source URLs/timestamps.
+- Separate editorial selection, language validation, asset retrieval, rendering, and platform publishing into independently testable stages.
+- Keep production branch `main` unchanged until recovery branch passes tests and is explicitly reviewed.
+- No secrets, access tokens, or private credentials may be written to repository files or logs.
+
+## Editorial scoring design (initial target)
+
+Rank candidates using a transparent score, not raw keyword count:
+- Public impact / consequence
+- Political and constitutional significance
+- Court / judiciary significance
+- Breaking urgency and freshness
+- Independent source corroboration
+- Reliability of source and evidence
+- Novelty / update value
+- Repetition and low-value press-release penalty
+
+Required coverage lanes: PTI / Imran Khan / opposition; judiciary and constitutional matters; parliament and government accountability; public-interest cost-of-living issues; national security and foreign affairs; major international developments. Coverage is not a partisan quota: factual importance and verification govern publication.
+
+## Poster design specification
+
+International premium newsroom identity, branded **Adeel Raja**:
+- Strong editorial photograph or verified event image as the dominant visual.
+- Clear hierarchy: category / urgency, concise Urdu headline, one supporting line, source and timestamp, Adeel Raja brand.
+- Premium dark newsroom palette with restrained accent colours; no clutter, excessive badges, or tiny copy.
+- Correct Urdu shaping with a verified Nastaliq-capable font and RAQM support.
+- Automatic line wrapping, font fitting, safe margins, image crop checks, and rendered-image QA.
+- Distinct templates for breaking, politics/courts, and public-interest explainers.
+- If a suitable image cannot be retrieved and validated, block publishing and flag for review.
+
+## Video specification
+
+A separate 9:16 production pipeline:
+- Urdu script and fact-check
+- Voice-over (free/local option where feasible)
+- Licensed/approved stills and motion graphics
+- Burned-in Urdu subtitles
+- 1080x1920 rendering and duration checks
+- YouTube Shorts upload only after OAuth is configured and user authorizes it
+- Keep Facebook and YouTube outputs independently configurable.
+
+## Phased implementation
+
+### Phase 0 — Preserve and inspect
+- Keep `main` untouched.
+- Work only on `recovery/international-newsroom`.
+- Inventory source, manifests, dependencies, workflows, recent commits, and available run logs.
+
+### Phase 1 — Stop harmful output
+- Remove English fallback publishing.
+- Repair editor validation and add unit tests.
+- Ensure failures are visible and do not silently produce low-quality posts.
+
+### Phase 2 — Editorial intelligence
+- Improve feed collection and source metadata.
+- Add deduplication, freshness, topic lanes, corroboration, scoring, and low-value press-release suppression.
+- Add tests using representative Pakistan political, judiciary, public-interest, and routine press-release examples.
+
+### Phase 3 — Urdu quality gate
+- Strict schema, Urdu-script checks, names/numbers/source validation, and no-publish behavior on failure.
+- Human review mode for uncertain/high-risk claims.
+
+### Phase 4 — Poster studio
+- Image retrieval with source/licensing metadata and relevance checks.
+- Three premium Adeel Raja templates and render QA.
+- Save each card under a unique filename; never overwrite the only output.
+
+### Phase 5 — Shorts and animation
+- Build and test vertical video rendering independently of publishing.
+- Add subtitles, voice-over, motion graphics, and repeatable templates.
+
+### Phase 6 — Distribution and operations
+- Add independently gated Facebook / YouTube / WhatsApp adapters as permissions allow.
+- Add duplicate prevention, retry safety, publishing receipts, failure notifications, and scheduled runs.
+- Validate free-tier quotas and platform limits before enabling schedules.
+
+### Phase 7 — Acceptance testing
+- At least 20 representative stories across all coverage lanes.
+- No English fallback, no missing-image publication, no duplicate posts, and no broken Urdu layout.
+- Render and inspect multiple poster variants and Shorts.
+- Confirm platform receipts and actual published URLs before declaring production-ready.
+
+## Evidence still required
+
+- Full GitHub Actions run history and job logs (to measure actual runtime failures).
+- Screenshots or artifact samples of posters and generated videos.
+- Current connected platform permissions and OAuth status.
+- Whether any separate branches/workflows or external video experiments exist outside the inspected default-branch files.
+
+This is a source-code audit of the inspected default-branch files, not a claim that every external integration or historical run has been exhaustively verified.
+
+
+## Additional confirmed findings from GitHub Actions run 41624859464 (2026-11-03)
+
+The workflow and job were marked successful, but the job log shows the newsroom did not successfully publish:
+
+- Scout collected 30 stories.
+- Gemini returned repeated HTTP 503 UNAVAILABLE errors (high demand).
+- The application then used its simple English fallback despite the intended Urdu-first workflow.
+- Facebook Graph API returned HTTP 403 / OAuthException code 200: the permission `publish_actions` is deprecated/unavailable.
+- The Strategist returned error dictionaries, but the old `main.py` only printed those dictionaries and did not fail the job. Therefore GitHub Actions reported success despite Facebook publication failure.
+- The `latest-poster` artifact uploaded successfully, but artifact upload success is not evidence of successful Facebook publishing or editorial quality.
+
+This proves the prior green workflow status was a false positive for end-to-end newsroom success. Phase 1 must treat platform error receipts as job failures and distinguish artifact creation from publishing confirmation.
+
+## Run status interpretation
+
+A green Actions run currently proves only that the Python process exited successfully and the artifact step completed. It does not prove that a Facebook post was created. Production acceptance must check the platform response ID and, where possible, the resulting post URL.
+
+
+## Recovery implementation update (9 November 2026)
+
+Implemented on `recovery/international-newsroom` (not merged to production):
+
+- Replaced the first-five RSS collector with up to 30 entries per feed, date parsing, basic topic lanes, duplicate-title suppression, and recency/topic/press-release heuristics.
+- Repaired the Urdu editor validation path and disabled English/raw-RSS fallback publishing. The editor now must return an exact source URL so image and source metadata can be safely mapped back to the original feed item.
+- Rebuilt poster rendering around a large editorial image, restrained international-newsroom hierarchy, Adeel Raja branding, Urdu Naskh font discovery, RAQM shaping, and unique output filenames. Missing or invalid images now block poster creation.
+- Added vertical 9:16 reel rendering with Urdu TTS via Edge TTS and ffmpeg motion treatment.
+- Added an optional YouTube Shorts uploader, gated behind explicit workflow input and OAuth secrets. Default privacy is private.
+- Added a rotating daily Urdu audience-poll library and a scheduled dry-run workflow. Publishing remains gated behind the repository variable `ENABLE_DAILY_POLL` or a manual approval input.
+- Added a four-hour scheduled newsroom dry-run. Facebook and YouTube publishing remain disabled by default.
+- Added deterministic regression tests for editorial scoring, press-release penalties, Urdu fallback rejection, missing-image blocking, and poll rotation.
+
+## Known limitations / user-side prerequisites
+
+- RSS keyword/topic scoring is a transparent heuristic, not a fully trained editorial judgement system. It does not yet provide robust cross-source corroboration or semantic clustering; editorial sampling is required before production use.
+- RSS image presence does not itself prove reuse rights. Confirm publisher image permissions or replace the image source with appropriately licensed assets before broad automated distribution.
+- Facebook publishing requires a current Page access token and the correct Page permissions (not the deprecated `publish_actions` permission). A successful code check cannot grant these permissions.
+- YouTube uploads require the user to create/authorise an OAuth client, enable YouTube Data API v3, and add `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, and `YOUTUBE_REFRESH_TOKEN` as GitHub secrets. Uploads default to private.
+- WhatsApp Channel publishing is not implemented in this recovery branch. A valid official channel-publishing integration and credentials must be confirmed; do not substitute a WhatsApp Business messaging endpoint and claim it publishes to a Channel.
+- A daily poll workflow and library exist, but automatic live posting remains off until Page permissions are verified and the repository variable is deliberately enabled.
+- The new poster and video pipelines still require a real end-to-end run with live RSS images and the configured TTS service. CI compilation/unit tests alone do not prove visual quality or successful media generation.
+- GitHub Actions schedule timing is best-effort and may be delayed by GitHub. The four-hour workflow is intentionally dry-run by default.
+
+## Acceptance status
+
+Code-level regression checks have passed on intermediate recovery commits. Final acceptance remains pending: latest-commit CI, live dry-run poster/reel artifacts, image rights review, sample Urdu editorial review, and platform-authorisation checks.
+
+
+## Final verification update
+
+- The latest full regression run before the Gemini model default adjustment completed successfully: **16 unit tests passed**.
+- Model default is set to `gemini-3.8-flash`, not legacy `gemini-2.5-flash`. Google AI Developers Forum guidance in November 2026 recommends Gemini 3.5 Flash-Lite or 3.8 Flash for new projects; 2.5 access is restricted to projects with prior usage.
+- Persistent per-platform publication receipts were added and are saved/restored through GitHub Actions cache as a best-effort duplicate guard.
+- A daily Urdu poll library (30 prompts across politics, courts, public interest, world affairs and entertainment) and a gated daily workflow were added.
+- A user activation checklist is available at `docs/ACTIVATION-CHECKLIST.md`.
+
+The recovery branch is still intentionally separate from `main`. Do not call the newsroom production-ready until a live dry-run has produced inspectable poster and video artifacts and platform permissions have been confirmed.
+
+
+## Consolidated older-thread requirements and implementation (9 November 2026)
+
+The earlier reliability branch / PR #1 was inspected. Its Urdu validator, font fallback and preview workflow changes are superseded by the recovery branch implementation; production `main` remains unchanged. Do not merge the old PR independently.
+
+### Recovered requirements now represented in code
+
+- Brand the newsroom outputs as **Adeel Raja**. Keep the Adeel Raja Views main channel and Adeel Raja Shorts separate; promote Facebook, X and TikTok links. Telegram is not part of this distribution plan.
+- Collect from Geo, ARY, Dawn, Express, The News, Tribune, ProPakistani and BBC Urdu, plus focused Google News RSS searches for PTI/Imran Khan, courts/judiciary, breaking developments, cost of living and security.
+- Add a configurable `X_RSS_FEEDS` bridge for public X-to-RSS feeds. This deliberately does not scrape X or depend on a paid X API.
+- Rank for public impact, freshness and major developments; reserve candidate slots for politics/PTI, courts/judiciary and public-interest news; penalise or exclude routine ceremonial press releases; cluster similar headlines across sources.
+- Recover missing article images from safe public HTTPS Open Graph/Twitter metadata. Refuse unsafe redirects, invalid images and broken image-less posters.
+- Generate Urdu-first and English companion copy in the same editorial pass. Urdu is required and remains the primary poster/reel language; English companion text is required for bilingual captions and distribution drafts.
+- Rebuild the 4:5 poster as a clean international image-first layout with a readable masthead, large Urdu headline, restrained red accent, date/source footer and Adeel Raja branding.
+- Produce 9:16 Urdu-narrated video with zoom movement, animated progress line and moving newsroom ticker. This is motion-graphics animation over editorial still imagery, not AI-generated cinematic footage.
+- Prepare WhatsApp Channel and X post drafts alongside Facebook/YouTube copy. Facebook can publish via Page API; YouTube Shorts upload remains optional, OAuth-gated and private by default.
+- Prepare a rotating daily Urdu question/opinion prompt covering politics, courts, public issues, world affairs and entertainment. Daily workflow prepares WhatsApp/X drafts; Facebook text publishing remains gated.
+- Run the newsroom hourly (minute 17) with publishing off by default; daily engagement draft runs at 18:00 Pakistan time.
+
+### Platform and free-tier constraints
+
+- Gemini API has a documented free tier, but its quotas vary by model/project and may be exhausted. The newsroom uses one bounded bilingual editorial request per run and stops safely when the quota is exhausted. No paid billing is required by this code; keep the Google project on its free tier and do not enable paid billing.
+- X ingestion requires a user-supplied working public RSS bridge in repository variable `X_RSS_FEEDS`; direct X API reading/publishing is not included because it is not a dependable free integration.
+- Meta's official WhatsApp Business Cloud API documentation does not expose a WhatsApp Channel publishing endpoint. The system therefore prepares ready-to-post Channel drafts and assets for manual posting; it does not use unofficial WhatsApp Web automation.
+- The WhatsApp Channel invitation URL can be set as repository variable `WHATSAPP_CHANNEL_URL`; until supplied, no link is invented.
+- YouTube Shorts upload requires OAuth secrets and a manually authorised channel. No upload occurs unless the manual workflow input enables it.
+- Publisher RSS/OG images may be copyrighted. Confirm rights or configure licensed image sources before automated public distribution.
+
+### Current acceptance gates
+
+1. Latest commit must pass Recovery Quality Checks (compile + deterministic tests).
+2. Run the hourly newsroom workflow manually with both publish flags false.
+3. Inspect JPG posters, MP4 reels, bilingual captions, WhatsApp JSON drafts and X text drafts.
+4. Review Urdu quality, image relevance/rights and actual video motion/voice.
+5. Confirm Facebook Page permissions and complete a controlled test post.
+6. Configure YouTube OAuth and test a private Short.
+7. Supply a verified X RSS bridge and WhatsApp invite URL if those features are to be connected.
+8. Only then approve the recovery PR and merge it to `main`.
+
+Do not describe the project as fully live until these runtime and account-authorisation gates pass.
+
+
+### Poster design requirements recovered from 6 November discussion
+
+The user clarified that “three premium designs” means **three distinct poster directions**, not three posters for each story. The three approved directions are:
+
+1. **Light Editorial** — warm, bright editorial page with a dominant photograph and oversized Urdu headline.
+2. **Dark Editorial** — midnight newsroom treatment with a dominant photograph and high-contrast Urdu headline.
+3. **White + Red** — clean white page, framed photograph and strong red editorial accent.
+
+The renderer now rotates one style per story and persists the rotation counter between GitHub Actions runs. It supports 23 editorial categories with restrained category accents; the red breaking badge is reserved for stories marked potential-breaking. Posters remain uncluttered, image-led, readable at a distance and suitable for conversion to 9:16 reels.
+
+
+### Free-tier request protection
+
+A persisted daily Gemini API request budget now caps all actual model calls (including retries) at 16 per Pacific Time calendar day. This leaves headroom below the earlier 20/day quota concern, resets at midnight Pacific Time, and is saved/restored with the GitHub Actions state cache. Hourly RSS collection continues, but after the cap the editor safely stops for the rest of that local day instead of switching to raw RSS or English fallback.
+
+
+Google AI Studio's published rate-limit guidance says request-per-day quotas reset at midnight Pacific Time and vary by model/project. The local cap therefore follows Pacific Time, not Pakistan time, and is set to 16 requests/day as a conservative ceiling; it is not a claim that every Gemini model has the same 20-request quota. Free-tier requests may be used by Google to improve its products, so send only public news material, not confidential sources or unpublished sensitive notes.

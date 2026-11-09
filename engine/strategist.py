@@ -1,4 +1,5 @@
 
+import mimetypes
 import os
 import requests
 
@@ -63,7 +64,7 @@ class StrategistAgent:
                     "source": (
                         os.path.basename(image_path),
                         image_file,
-                        "image/png"
+                        mimetypes.guess_type(image_path)[0] or "image/jpeg"
                     )
                 }
 
@@ -136,6 +137,28 @@ class StrategistAgent:
                     f"{type(exc).__name__}: {exc}"
                 )
             }
+
+
+    def publish_text_post(self, message):
+        """Publish a text-only Page post using current Pages API permissions."""
+        if not self.page_id or not self.access_token:
+            return {"error": "Facebook Page ID or Page Access Token is missing."}
+        url = f"{self.base_url}/{self.page_id}/feed"
+        try:
+            response = requests.post(
+                url,
+                data={"message": message, "access_token": self.access_token},
+                timeout=self.timeout,
+            )
+            try:
+                result = response.json()
+            except ValueError:
+                return {"error": "Facebook returned a non-JSON response.", "http_status": response.status_code}
+            if response.status_code >= 400 or "error" in result or not result.get("id"):
+                return {"error": result.get("error", result), "http_status": response.status_code}
+            return result
+        except requests.RequestException as exc:
+            return {"error": f"Facebook text post failed: {exc}"}
 
     @classmethod
     def publish(cls, image_path, caption):

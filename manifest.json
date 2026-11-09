@@ -1,5 +1,7 @@
 {
-  "brand_name": "Pakistan Inside",
+  "brand_name": "Adeel Raja",
+  "publisher_name": "Adeel Raja",
+  "tagline": "THE STORY BEHIND THE STORY",
   "rss_feeds": [
     "https://www.geo.tv/rss/1/1",
     "https://arynews.tv/feed/",
@@ -7,7 +9,34 @@
     "https://express.pk/feed/",
     "https://www.thenews.com.pk/rss/1/1",
     "https://tribune.com.pk/feed/",
-    "https://propakistani.pk/feed/"
+    "https://propakistani.pk/feed/",
+    "https://www.bbc.com/urdu/index.xml"
   ],
-  "posting_interval_minutes": 45
+  "additional_rss_feeds": [
+    "https://news.google.com/rss/search?q=(PTI+OR+%22Imran+Khan%22)+Pakistan&hl=en-PK&gl=PK&ceid=PK:en",
+    "https://news.google.com/rss/search?q=Pakistan+Supreme+Court+OR+High+Court+OR+judiciary&hl=en-PK&gl=PK&ceid=PK:en",
+    "https://news.google.com/rss/search?q=Pakistan+breaking+news+OR+major+development&hl=en-PK&gl=PK&ceid=PK:en",
+    "https://news.google.com/rss/search?q=Pakistan+electricity+prices+OR+petrol+prices+OR+inflation&hl=en-PK&gl=PK&ceid=PK:en",
+    "https://news.google.com/rss/search?q=Pakistan+constitutional+politics+OR+election+commission&hl=en-PK&gl=PK&ceid=PK:en",
+    "https://news.google.com/rss/search?q=Pakistan+terror+attack+OR+security+incident&hl=en-PK&gl=PK&ceid=PK:en"
+  ],
+  "entries_per_feed": 35,
+  "feed_timeout_seconds": 15,
+  "editorial_candidate_limit": 20,
+  "minimum_story_score": 8,
+  "max_posts_per_run": 3,
+  "posting_interval_minutes": 60,
+  "social_links": {
+    "youtube": "https://www.youtube.com/@adeelrajaviews",
+    "youtube_shorts": "https://www.youtube.com/@adeelrajashorts",
+    "facebook": "https://www.facebook.com/adeelrajaviews",
+    "x": "https://x.com/adeelraja",
+    "tiktok": "https://www.tiktok.com/@adeelrajaviews",
+    "whatsapp_channel": ""
+  },
+  "x_monitoring": {
+    "enabled": false,
+    "mode": "optional_rss_bridge",
+    "description": "No paid X API or unofficial scraping. Add a verified public RSS bridge URL to X_RSS_FEEDS if available."
+  }
 }
