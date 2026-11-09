@@ -95,7 +95,7 @@ class VideoAgent:
 
         command = [
             "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-            "-loop", "1", "-framerate", "30", "-i", str(frame_path),
+            "-i", str(frame_path),
             "-i", str(audio_path),
             "-vf", f"zoompan=z='min(zoom+0.00045,1.07)':d={frames}:s=1080x1920:fps=30,format=yuv420p",
             "-c:v", "libx264", "-preset", "veryfast", "-tune", "stillimage",
