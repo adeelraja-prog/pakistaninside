@@ -20,7 +20,7 @@ class DailyRequestBudgetTests(unittest.TestCase):
             with self.assertRaises(RequestBudgetExceeded):
                 budget.consume()
 
-    def test_budget_resets_on_next_pakistan_day(self):
+    def test_budget_resets_on_next_pacific_day(self):
         with tempfile.TemporaryDirectory() as directory:
             path = str(Path(directory) / "usage.json")
             first = DailyRequestBudget(
