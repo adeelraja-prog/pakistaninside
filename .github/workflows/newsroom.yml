@@ -92,6 +92,7 @@ jobs:
           name: adeel-raja-newsroom-outputs
           path: |
             assets/output/*.jpg
+            assets/output/drafts/*
             assets/videos/*.mp4
           if-no-files-found: ignore
           retention-days: 7
