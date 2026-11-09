@@ -2,6 +2,7 @@
 
 import hashlib
 import ipaddress
+import os
 import json
 import re
 import socket
@@ -167,6 +168,8 @@ class ScoutAgent:
     def fetch_rss_news(self):
         stories = []
         feeds = self.config.get("rss_feeds", []) + self.config.get("additional_rss_feeds", [])
+        # Optional public X-to-RSS bridge URLs; no paid X API or scraping is used.
+        feeds.extend(url.strip() for url in os.getenv("X_RSS_FEEDS", "").split(";") if url.strip())
         for feed_url in feeds:
             try:
                 response = self.session.get(feed_url, timeout=self.timeout)
