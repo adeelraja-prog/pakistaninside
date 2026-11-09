@@ -11,14 +11,17 @@ The recovery work lives on `recovery/international-newsroom`. The original `main
    - `FACEBOOK_PAGE_ACCESS_TOKEN`
 3. Confirm the Facebook Page token is a current Page access token with `pages_manage_posts` permission. The deprecated `publish_actions` permission is not a substitute.
 4. Keep `GEMINI_MODEL` unset unless you have verified another model for this AI Studio project. Default is `gemini-3.8-flash`; legacy Gemini 2.5 access may be restricted for projects without prior use.
-5. Run the newsroom manually with both publish inputs set to false. Inspect the poster and MP4 artifacts before enabling publication.
-6. For YouTube, create an OAuth client, enable YouTube Data API v3, complete user authorisation, then add:
+5. Add optional repository variables:
+   - `X_RSS_FEEDS`: semicolon-separated public X-to-RSS bridge URLs, only if you have a verified working bridge.
+   - `WHATSAPP_CHANNEL_URL`: your real WhatsApp Channel invite link.
+6. Run the newsroom manually with both publish inputs set to false. Inspect JPG posters, MP4 reels, bilingual copy and platform drafts before enabling publication.
+7. For YouTube, create an OAuth client, enable YouTube Data API v3, complete user authorisation, then add:
    - `YOUTUBE_CLIENT_ID`
    - `YOUTUBE_CLIENT_SECRET`
    - `YOUTUBE_REFRESH_TOKEN`
    Uploads default to private. Only change `YOUTUBE_PRIVACY_STATUS` after review.
-7. To enable the daily Facebook poll, verify Page permissions and then set repository variable `ENABLE_DAILY_POLL=true`.
-8. Scheduled workflows run only after the recovery branch is merged into the repository's default branch. GitHub schedule start times may be delayed.
+8. To enable the daily Facebook question post, verify Page permissions and then set repository variable `ENABLE_DAILY_POLL=true`.
+9. Scheduled workflows run only after the recovery branch is merged into the repository's default branch. GitHub schedule start times may be delayed.
 
 ## Safe defaults
 
@@ -33,4 +36,6 @@ The recovery work lives on `recovery/international-newsroom`. The original `main
 
 - WhatsApp Channel publishing is not wired up in this branch. Do not use the WhatsApp Business messaging endpoint as a substitute for Channel publishing.
 - The current image pipeline reads publisher-supplied RSS media. Verify reuse rights for the images or configure a licensed image source before large-scale distribution.
+- X reading needs a verified RSS bridge; no paid X API or scraping is used.
+- WhatsApp Channel posts are prepared as drafts for manual posting because the official Cloud API does not expose Channel publishing.
 - RSS ranking and headline clustering are heuristic aids, not a substitute for editorial review.
