@@ -15,6 +15,19 @@ class PublishedState:
         except (OSError, json.JSONDecodeError):
             self.data = {}
 
+    def next_poster_style(self):
+        """Rotate the three approved editorial looks across runs."""
+        styles = ("light_editorial", "dark_editorial", "white_red")
+        meta = self.data.setdefault("_meta", {})
+        index = int(meta.get("poster_style_index", 0))
+        style = styles[index % len(styles)]
+        meta["poster_style_index"] = index + 1
+        self.path.write_text(
+            json.dumps(self.data, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        return style
+
     def is_published(self, source_url, platform):
         return bool(self.data.get(source_url, {}).get(platform))
 
