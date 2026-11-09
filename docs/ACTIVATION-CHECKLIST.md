@@ -10,11 +10,11 @@ The recovery work lives on `recovery/international-newsroom`. The original `main
    - `FACEBOOK_PAGE_ID`
    - `FACEBOOK_PAGE_ACCESS_TOKEN`
 3. Confirm the Facebook Page token is a current Page access token with `pages_manage_posts` permission. The deprecated `publish_actions` permission is not a substitute.
-4. Keep `GEMINI_MODEL` unset unless you have verified another model for this AI Studio project. Default is `gemini-3.8-flash`; legacy Gemini 2.5 access may be restricted for projects without prior use.
+4. Keep `GEMINI_MODEL` unset unless you have verified another model for this AI Studio project. Default is `gemini-3.8-flash`. Use Google AI Studio's free tier only; do not attach paid billing or enable a paid usage tier. If the free quota is exhausted, publishing stops safely.
 5. Add optional repository variables:
    - `X_RSS_FEEDS`: semicolon-separated public X-to-RSS bridge URLs, only if you have a verified working bridge.
    - `WHATSAPP_CHANNEL_URL`: your real WhatsApp Channel invite link.
-6. Run the newsroom manually with both publish inputs set to false. Inspect JPG posters, MP4 reels, bilingual copy and platform drafts before enabling publication.
+6. Run the newsroom manually with both publish inputs set to false. Inspect JPG posters, MP4 reels, bilingual copy and platform drafts before enabling publication. Posters rotate through Light Editorial, Dark Editorial and White + Red; the 23 category labels use restrained accents.
 7. For YouTube, create an OAuth client, enable YouTube Data API v3, complete user authorisation, then add:
    - `YOUTUBE_CLIENT_ID`
    - `YOUTUBE_CLIENT_SECRET`
@@ -39,3 +39,4 @@ The recovery work lives on `recovery/international-newsroom`. The original `main
 - X reading needs a verified RSS bridge; no paid X API or scraping is used.
 - WhatsApp Channel posts are prepared as drafts for manual posting because the official Cloud API does not expose Channel publishing.
 - RSS ranking and headline clustering are heuristic aids, not a substitute for editorial review.
+- Reels use image motion, an animated ticker/progress line and Urdu narration; they are not AI-generated cinematic video scenes.
