@@ -50,6 +50,23 @@ class ScoutAgent:
             "ایران", "امریکا", "امریکی", "china", "india", "ukraine",
             "gaza", "war", "ceasefire",
         ],
+        "HEALTH": ["health", "hospital", "doctor", "medical", "صحت", "اسپتال", "ڈاکٹر", "ویکسین", "ادویات"],
+        "EDUCATION": ["education", "school", "university", "students", "تعلیم", "اسکول", "جامعہ", "طلبہ", "امتحان"],
+        "TECHNOLOGY": ["technology", "cyber", "internet", "artificial intelligence", "ٹیکنالوجی", "انٹرنیٹ", "سائبر", "مصنوعی ذہانت"],
+        "BUSINESS": ["business", "company", "industry", "investment", "کاروبار", "کمپنی", "صنعت", "سرمایہ کاری"],
+        "SPORTS": ["cricket", "football", "sports", "match", "کھیل", "کرکٹ", "فٹبال", "میچ"],
+        "ENTERTAINMENT": ["entertainment", "drama", "film", "actor", "showbiz", "تفریح", "ڈرامہ", "فلم", "اداکار"],
+        "CRIME": ["crime", "murder", "robbery", "police", "قتل", "ڈکیتی", "پولیس", "اغوا"],
+        "ENVIRONMENT": ["environment", "pollution", "smog", "forest", "ماحول", "آلودگی", "اسموگ", "جنگلات"],
+        "ENERGY": ["energy", "power plant", "electricity generation", "توانائی", "بجلی گھر", "بجلی کی پیداوار"],
+        "TRANSPORT": ["transport", "railway", "motorway", "traffic", "ٹرانسپورٹ", "ریلوے", "موٹروے", "ٹریفک"],
+        "GOVERNANCE": ["governance", "cabinet", "minister", "policy", "انتظامی", "کابینہ", "وزیر", "پالیسی"],
+        "ELECTIONS": ["election", "polling", "constituency", "vote", "انتخابات", "ووٹ", "حلقہ", "پولنگ"],
+        "DIPLOMACY": ["diplomacy", "foreign minister", "bilateral", "summit", "سفارت", "وزیر خارجہ", "دوطرفہ", "سربراہی اجلاس"],
+        "HUMAN_RIGHTS": ["human rights", "rights violation", "freedom of expression", "انسانی حقوق", "حقوق کی خلاف ورزی", "آزادی اظہار"],
+        "CLIMATE": ["climate", "flood", "heatwave", "drought", "موسمیاتی", "سیلاب", "ہیٹ ویو", "خشک سالی"],
+        "INVESTIGATION": ["investigation", "investigative", "exposé", "leaked", "تحقیقات", "تحقیقاتی", "انکشاف", "لیک"],
+        "LOCAL": ["municipal", "local government", "city administration", "بلدیاتی", "مقامی حکومت", "شہری انتظامیہ"],
     }
 
     HIGH_IMPACT_TERMS = [
