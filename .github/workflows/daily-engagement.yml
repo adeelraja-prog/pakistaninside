@@ -29,6 +29,7 @@ jobs:
         env:
           FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
           FACEBOOK_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID }}
+          WHATSAPP_CHANNEL_URL: ${{ vars.WHATSAPP_CHANNEL_URL || '' }}
           PUBLISH_DAILY_POLL: ${{ (github.event_name == 'workflow_dispatch' && inputs.publish) || vars.ENABLE_DAILY_POLL || false }}
         run: python -m engine.daily_poll
       - name: Upload poll draft
