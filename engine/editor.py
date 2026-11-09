@@ -62,7 +62,24 @@ class EditorAgent:
                 if not isinstance(data, list) or not data:
                     raise GeminiOutputError("Expected a non-empty JSON array")
 
-                return [self._validate_item(item, language) for item in data]
+                validated = []
+                source_map = {story.get("link"): story for story in stories if story.get("link")}
+                for item in data:
+                    clean = self._validate_item(item, language)
+                    original = source_map.get(clean.get("source_url"))
+                    if not original:
+                        raise GeminiOutputError("Editor output did not preserve a valid source_url")
+                    clean.update({
+                        "source_url": original.get("link", ""),
+                        "source_name": original.get("source", clean["source_name"]),
+                        "image_url": original.get("image_url", ""),
+                        "published_at": original.get("published_at", ""),
+                        "impact_score": original.get("impact_score", 0),
+                        "urgency": original.get("urgency", "NORMAL"),
+                        "topics": original.get("topics", []),
+                    })
+                    validated.append(clean)
+                return validated
 
             except Exception as exc:
                 message = str(exc).lower()
@@ -97,7 +114,8 @@ EDITORIAL RULES:
 - Every item must include a proper Urdu-script headline and body.
 
 Return only a JSON array. Each object must contain exactly:
-"tag", "headline", "urdu_text", "body", "source_name", "source_attribution", "language".
+"tag", "headline", "urdu_text", "body", "source_name", "source_attribution", "source_url", "language".
+For source_url, copy the exact original link from the corresponding input story. Never invent or modify a URL.
 Use language="ur". tag must be one of: {", ".join(sorted(self.ALLOWED_TAGS))}.
 
 INPUT STORIES:
@@ -131,6 +149,7 @@ INPUT STORIES:
             "body": body or urdu_text[:140],
             "source_name": str(item.get("source_name") or "Source not specified").strip(),
             "source_attribution": str(item.get("source_attribution") or "ذرائع کے مطابق").strip(),
+            "source_url": str(item.get("source_url") or "").strip(),
             "language": "ur",
         }
 
