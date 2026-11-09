@@ -22,7 +22,7 @@ class GeminiOutputError(Exception):
 class EditorAgent:
     ALLOWED_TAGS = {
         "POLITICS", "ECONOMY", "COURT", "HEALTH",
-        "TECH", "DEFENSE", "GENERAL", "PUBLIC_INTEREST",
+        "TECH", "DEFENSE", "GENERAL", "PUBLIC_INTEREST", "WORLD",
     }
 
     def __init__(self):
@@ -115,9 +115,12 @@ EDITORIAL RULES:
 - If the source material is insufficient, say so in the text or exclude the item.
 - Keep the headline concise, factual and compelling. No clickbait.
 - Every item must include a proper Urdu-script headline and body.
+- Also provide a concise, accurate English headline and English summary for bilingual distribution.
+- Urdu is the primary publication language; English must not replace or dilute the Urdu story.
+- Use neutral Pakistani newsroom vocabulary and preserve the difference between allegations, official claims and verified facts.
 
 Return only a JSON array. Each object must contain exactly:
-"tag", "headline", "urdu_text", "body", "source_name", "source_attribution", "source_url", "language".
+"tag", "headline", "urdu_text", "body", "english_headline", "english_text", "source_name", "source_attribution", "source_url", "language".
 For source_url, copy the exact original link from the corresponding input story. Never invent or modify a URL.
 Use language="ur". tag must be one of: {", ".join(sorted(self.ALLOWED_TAGS))}.
 
@@ -132,8 +135,13 @@ INPUT STORIES:
         headline = str(item.get("headline") or "").strip()
         urdu_text = str(item.get("urdu_text") or "").strip()
         body = str(item.get("body") or "").strip()
+        english_headline = str(item.get("english_headline") or "").strip()
+        english_text = str(item.get("english_text") or "").strip()
         if not headline or not urdu_text:
             raise GeminiOutputError("Missing Urdu headline or story text")
+
+        if not english_headline or not english_text:
+            raise GeminiOutputError("Missing English headline or summary for bilingual output")
 
         # Require meaningful Arabic-script Urdu; English-only fallback is forbidden.
         arabic_chars = re.findall(r"[\u0600-\u06FF]", headline + " " + urdu_text)
@@ -148,7 +156,8 @@ INPUT STORIES:
             "tag": tag,
             "headline": headline,
             "urdu_text": urdu_text,
-            "english_text": "",
+            "english_headline": english_headline,
+            "english_text": english_text,
             "body": body or urdu_text[:140],
             "source_name": str(item.get("source_name") or "Source not specified").strip(),
             "source_attribution": str(item.get("source_attribution") or "ذرائع کے مطابق").strip(),
