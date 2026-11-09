@@ -10,7 +10,7 @@ The recovery work lives on `recovery/international-newsroom`. The original `main
    - `FACEBOOK_PAGE_ID`
    - `FACEBOOK_PAGE_ACCESS_TOKEN`
 3. Confirm the Facebook Page token is a current Page access token with `pages_manage_posts` permission. The deprecated `publish_actions` permission is not a substitute.
-4. Keep `GEMINI_MODEL` unset unless you have verified another model for this AI Studio project. Default is `gemini-3.8-flash`. Use Google AI Studio's free tier only; do not attach paid billing or enable a paid usage tier. If the free quota is exhausted, publishing stops safely.
+4. Keep `GEMINI_MODEL` unset unless you have verified another model for this AI Studio project. Default is `gemini-3.8-flash`. Use Google AI Studio's free tier only; do not attach paid billing or enable a paid usage tier. The code caps calls at 16 per Pacific Time day, including retries. Free-tier prompts may be used by Google to improve its products, so send public news only—not confidential source identities or unpublished sensitive notes.
 5. Add optional repository variables:
    - `X_RSS_FEEDS`: semicolon-separated public X-to-RSS bridge URLs, only if you have a verified working bridge.
    - `WHATSAPP_CHANNEL_URL`: your real WhatsApp Channel invite link.
