@@ -18,7 +18,11 @@ def main():
     try:
         editor = EditorAgent()
         # Urdu-first is a hard requirement. Never silently downgrade to English.
-        processed = editor.process_stories(stories[:6], language="ur")
+        image_candidates = [story for story in stories if story.get("image_url")]
+        if not image_candidates:
+            print("[SAFE STOP] No stories with retrievable editorial images were found.")
+            return 2
+        processed = editor.process_stories(image_candidates[:8], language="ur")
     except GeminiQuotaExceededError as exc:
         print(f"[EDITOR BLOCKED] Urdu generation quota exhausted: {exc}")
         print("[SAFE STOP] No English fallback will be published.")
